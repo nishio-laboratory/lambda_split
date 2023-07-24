@@ -70,7 +70,7 @@ class Edge(Base):
 
         with torch.no_grad():
             output = self.third_model(
-                second_feature_vector, 
+                inputs_embeds=second_feature_vector, 
                 split_second_layer_index=split_second_layer_index
             )
 

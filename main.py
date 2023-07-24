@@ -8,7 +8,7 @@ from src.util import Prompter
 
 
 def main(first_split_layer_indices, second_split_layer_indices):
-    # cloud = Cloud(first_split_layer_indices, second_split_layer_indices)
+    cloud = Cloud(first_split_layer_indices, second_split_layer_indices)
     edge = Edge(first_split_layer_indices, second_split_layer_indices)
 
     instruction = "Tell me about Japan."
@@ -27,10 +27,10 @@ def main(first_split_layer_indices, second_split_layer_indices):
         first_feature_vector = edge.infer_first_model(input_ids)
 
         # TODO : 量子化
-        # second_feature_vector = cloud.infer_second_model(first_feature_vector)
+        second_feature_vector = cloud.infer_second_model(first_feature_vector)
 
         # TODO : 量子化
-        output = edge.infer_third_model(first_feature_vector)
+        output = edge.infer_third_model(second_feature_vector)
         
 
         # if idx == 0:
@@ -55,8 +55,10 @@ def main(first_split_layer_indices, second_split_layer_indices):
 
 
 if __name__ == '__main__':
-    # first == second == 0 or 32 の場合、1分割になる
-    first_split_layer_indices = {16}
-    second_split_layer_indices = {16}
+    # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
+    # first == second の場合、2分割になる
+    # first != second の場合、3分割になる
+    first_split_layer_indices = {0, 1, 2, 3, 4, 5}
+    second_split_layer_indices = {32, 31, 30, 29, 28}
 
     main(first_split_layer_indices, second_split_layer_indices)

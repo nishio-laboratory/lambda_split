@@ -41,7 +41,7 @@ class Cloud(Base):
 
         with torch.no_grad():
             second_feature_vector = self.second_model(
-                first_feature_vector, 
+                inputs_embeds=first_feature_vector, 
                 split_first_layer_index=split_first_layer_index, 
                 split_second_layer_index=split_second_layer_index
             )
