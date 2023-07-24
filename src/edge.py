@@ -33,8 +33,6 @@ class Edge(Base):
                 max_first_split_layer_index=self.max_first_split_layer_index
             )
 
-        print(self.first_model)
-
     def get_largest_third_model(self) -> None:
         self.third_model = self.load_model(position='third')
 
@@ -43,8 +41,6 @@ class Edge(Base):
             self.third_model.base_model.model.model.replace_unused_layers_with_identity(
                 min_second_split_layer_index=self.min_second_split_layer_index
             )
-
-        print(self.third_model)
 
     def infer_first_model(
             self, 

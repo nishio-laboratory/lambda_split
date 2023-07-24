@@ -1,3 +1,7 @@
+import io
+import time
+
+import numpy as np
 import torch
 import torchinfo
 from tqdm import tqdm
@@ -5,6 +9,17 @@ from tqdm import tqdm
 from src.cloud import Cloud
 from src.edge import Edge
 from src.util import Prompter
+
+
+BANDWIDTH = 500 * (1024 ** 2) # 100 Mbit/s
+
+
+# テンソルのシリアル化サイズを測定する関数
+def measure_tensor_size_in_memory(tensor: torch.Tensor) -> int:
+    buffer = io.BytesIO()
+    torch.save(tensor, buffer)
+    size = buffer.tell()
+    return size * 8
 
 
 def main(first_split_layer_indices, second_split_layer_indices):
@@ -26,9 +41,17 @@ def main(first_split_layer_indices, second_split_layer_indices):
         # Triadic split computing : edge -> cloud -> edge
         ## First model
         first_feature_vector = edge.infer_first_model(input_ids)
+        tensor_size_bit = measure_tensor_size_in_memory(first_feature_vector)
+        latency = tensor_size_bit / BANDWIDTH
+        print(f'{tensor_size_bit=} bit, {latency=} s')
+        time.sleep(latency)
 
         ## Second model
         second_feature_vector = cloud.infer_second_model(first_feature_vector)
+        tensor_size_bit = measure_tensor_size_in_memory(second_feature_vector)
+        latency = tensor_size_bit / BANDWIDTH
+        print(f'{tensor_size_bit=} bit, {latency=} s')
+        time.sleep(latency)
 
         ## Third model
         output = edge.infer_third_model(second_feature_vector)

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torchinfo
 from tqdm import tqdm
@@ -5,11 +6,16 @@ from tqdm import tqdm
 from src.cloud import Cloud
 from src.edge import Edge
 from src.util import Prompter
+from src.quantizer import Quantizer
+
+
+BANDWIDTH = 100 * (1024 ** 2)
 
 
 def main(first_split_layer_indices, second_split_layer_indices):
     cloud = Cloud(first_split_layer_indices, second_split_layer_indices)
     edge = Edge(first_split_layer_indices, second_split_layer_indices)
+    quantizer = Quantizer(method='standard', dtype=torch.int8)
 
     instruction = "Tell me about Japan."
     input = None
@@ -26,11 +32,17 @@ def main(first_split_layer_indices, second_split_layer_indices):
         # Triadic split computing : edge -> cloud -> edge
         ## First model
         first_feature_vector = edge.infer_first_model(input_ids)
+        coef_1, coef_2, quantized_first_feature_vector = quantizer.quantize(first_feature_vector)
+        print(first_feature_vector[0, 0])
 
         ## Second model
+        first_feature_vector = quantizer.dequantize(coef_1, coef_2, quantized_first_feature_vector)
+        print(first_feature_vector[0, 0])
         second_feature_vector = cloud.infer_second_model(first_feature_vector)
+        coef_1, coef_2, quantized_second_feature_vector = quantizer.quantize(second_feature_vector)
 
         ## Third model
+        second_feature_vector = quantizer.dequantize(coef_1, coef_2, quantized_second_feature_vector)
         output = edge.infer_third_model(second_feature_vector)
         
 

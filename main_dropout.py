@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torchinfo
 from tqdm import tqdm
@@ -5,6 +6,9 @@ from tqdm import tqdm
 from src.cloud import Cloud
 from src.edge import Edge
 from src.util import Prompter
+
+
+BANDWIDTH = 100 * (1024 ** 2)
 
 
 def main(first_split_layer_indices, second_split_layer_indices):
@@ -26,13 +30,15 @@ def main(first_split_layer_indices, second_split_layer_indices):
         # Triadic split computing : edge -> cloud -> edge
         ## First model
         first_feature_vector = edge.infer_first_model(input_ids)
+        first_feature_vector = torch.nn.Dropout(p=0.1)(first_feature_vector)
 
         ## Second model
         second_feature_vector = cloud.infer_second_model(first_feature_vector)
+        second_feature_vector = torch.nn.Dropout(p=0.1)(second_feature_vector)
 
         ## Third model
         output = edge.infer_third_model(second_feature_vector)
-        
+
 
         # if idx == 0:
         #     with open(f'torchinfo_summary_log/first_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:

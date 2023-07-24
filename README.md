@@ -24,6 +24,9 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 ## ファイルの説明
 
 - `main.py` : メインプログラム
+- `main_with_latency.py` : 中間層特徴ベクトルを送信するときにかかるレイテンシを考慮したメインプログラム
+- `main_dropout.py` : Dropoutを試すためのメインプログラム
+- `main_quantization.py` : 量子化を試すためのメインプログラム
 - `src/cloud.py` : クラウドクラス（first modelとthird modelを推論）
 - `src/edge.py` : エッジクラス（second modelを推論）
 - `src/base.py` : クラウドサーバ・エッジサーバの継承元クラス
