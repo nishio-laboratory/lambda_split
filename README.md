@@ -31,7 +31,7 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 - `src/base.py` : クラウドサーバ・エッジサーバの継承元クラス
 - `src/models.py` : 分割用のLLMクラスである`FirstLlamaModel`・`FirstLlamaForCausalLM`・`SecondLlamaModel`・`SecondLlamaForCausalLM`・`ThirdLlamaModel`・`ThirdLlamaForCausalLM`が定義されている
 - `src/utils.py` : LLaMa推論のためのutilを公式から持ってきている
-- `torchinfo_summary_?_1_31` : `main_3_split.py` で `first_split_layer_indices = {1}` と `second_split_layer_indices = {31}` を指定した場合の `torchinfo.summary` の結果
+- `torchinfo_summary_log/?_1_31` : `main_3_split.py` で `first_split_layer_indices = {1}` と `second_split_layer_indices = {31}` を指定した場合の `torchinfo.summary` の結果
 
 
 ## 実行方法

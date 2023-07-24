@@ -34,11 +34,11 @@ def main(first_split_layer_indices, second_split_layer_indices):
         
 
         # if idx == 0:
-        #     with open('torchinfo_summary_first.txt', 'w') as f:
+        #     with open(f'torchinfo_summary_log/first_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
         #         f.write(repr(torchinfo.summary(edge.first_model, input_data=input_ids, depth=10, col_width=50)))
-        #     with open('torchinfo_summary_second.txt', 'w') as f:
+        #     with open(f'torchinfo_summary_log/second_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
         #         f.write(repr(torchinfo.summary(cloud.second_model, input_data=first_feature_vector, depth=10, col_width=50)))
-        #     with open('torchinfo_summary_third.txt', 'w') as f:
+        #     with open(f'torchinfo_summary_log/third_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
         #         f.write(repr(torchinfo.summary(edge.third_model, input_data=second_feature_vector, depth=10, col_width=50)))
 
 
