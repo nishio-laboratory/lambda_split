@@ -8,7 +8,8 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 - LLM実装は、MetaのOpen Source LLMであるLLaMaを、Stanford Alpacaのデータセットを用いてLow-rank adaptation（LoRA）でファインチューニングした Alpaca-lora [1] を使用
 - Triadic にすることで、通信はすべて中間層出力の特徴ベクトルで行われるため、安全性が高い
 - Transformerベースの言語モデルがDecoderを複数重ねていることを利用し、分割するレイヤを毎回変えることで、特徴ベクトル形状は同じものの、異なるレイヤの中間層出力を送っているため、復元が難しい
-- 特徴ベクトルはサイズが大きいため、Int8量子化 [2] をして送信する（未実装）
+- LLMはサイズが大きいので、Splitしてサイズを小さくして多くのデバイスでロード可能にする
+- (特徴ベクトルはサイズが大きいため、Int8量子化 [2] をして送信する or Dropoutする)
 
 [1] https://github.com/tloen/alpaca-lora
 
@@ -43,4 +44,5 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 python3 main.py
 ```
 
-開始時にモデルのローディングで1分くらいかかる。
+初回時はPre-trainedモデルのダウンロードが必要。
+開始時に毎回Pre-trainedモデルのローディングで1分くらいかかる。
