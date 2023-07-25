@@ -25,8 +25,7 @@ def main(first_split_layer_indices, second_split_layer_indices):
 
         # Triadic split computing : edge -> cloud -> edge
         ## First model
-        first_feature_vector_with_past = edge.infer_first_model(input_ids)
-
+        first_feature_vector = edge.infer_first_model(input_ids)
 
         ## Second model
         second_feature_vector = cloud.infer_second_model(first_feature_vector)

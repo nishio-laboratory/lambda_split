@@ -58,9 +58,6 @@ class Base:
         else:
             self.device = "cpu"
 
-        # 乱数生成器
-        self.rng = np.random.default_rng(random_seed)
-
 
     def load_model(
             self, 
