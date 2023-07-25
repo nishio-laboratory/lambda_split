@@ -1,3 +1,5 @@
+import io
+
 import numpy as np
 import torch
 import torchinfo
@@ -30,32 +32,43 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
     inputs = edge.tokenizer(prompt, return_tensors="pt")
     input_ids = inputs["input_ids"].to(edge.device)
 
+    total_bit = 0
+    total_bit_save_bandwidth = 0
+
     for idx in tqdm(range(max_new_tokens)):
         print(idx)
-        split_first_layer_relative_index = rng.integers(0, num_first_split_layer_indices)
-        split_first_layer_index = first_split_layer_indices[split_first_layer_relative_index]
-
-        split_second_layer_relative_index = rng.integers(0, num_second_split_layer_indices)
-        split_second_layer_index = second_split_layer_indices[split_second_layer_relative_index]
 
         # Triadic split computing : edge -> cloud -> edge
         ## First model
-        first_feature_vector_with_past = edge.infer_first_model(input_ids, split_first_layer_index)
+        ### 分割するレイヤ番号を乱数で決める
+        split_first_layer_relative_index = rng.integers(0, num_first_split_layer_indices)
+        split_first_layer_index = first_split_layer_indices[split_first_layer_relative_index]
 
-        latest_past_index_stored_by_cloud = cloud.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index].shape[1] # <- エッジ側で持っておけばいい話
-        first_feature_vector_for_send = first_feature_vector_with_past[:, latest_past_index_stored_by_cloud:, :]
-        print(first_feature_vector_with_past.shape[1], latest_past_index_stored_by_cloud)
+        ### 0 から split_first_layer_index の層まで推論する
+        first_feature_vector = edge.infer_first_model(input_ids, split_first_layer_index)
+        first_feature_vector_for_send = edge.get_first_feature_vector_for_send(first_feature_vector, split_first_layer_index)
+
+        total_bit += measure_tensor_size_in_memory(first_feature_vector)
+        total_bit_save_bandwidth += measure_tensor_size_in_memory(first_feature_vector_for_send)
+        print(first_feature_vector.shape, first_feature_vector_for_send.shape)
 
 
         ## Second model
-        second_feature_vector_with_past = cloud.infer_second_model(first_feature_vector_for_send, split_first_layer_index, split_second_layer_index)
+        ### 分割するレイヤ番号を乱数で決める
+        split_second_layer_relative_index = rng.integers(0, num_second_split_layer_indices)
+        split_second_layer_index = second_split_layer_indices[split_second_layer_relative_index]
 
-        latest_past_index_stored_by_edge = edge.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index].shape[1] # <- クラウド側で持っておけばいい話
-        second_feature_vector_for_send = second_feature_vector_with_past[:, latest_past_index_stored_by_edge:, :]
-        print(second_feature_vector_with_past.shape[1], latest_past_index_stored_by_edge)
+        ### split_first_layer_index から split_second_layer_index の層まで推論する
+        second_feature_vector = cloud.infer_second_model(first_feature_vector_for_send, split_first_layer_index, split_second_layer_index)
+        second_feature_vector_for_send = cloud.get_second_feature_vector_for_send(second_feature_vector, split_second_layer_index)
+
+        total_bit += measure_tensor_size_in_memory(second_feature_vector)
+        total_bit_save_bandwidth += measure_tensor_size_in_memory(second_feature_vector_for_send)
+        print(second_feature_vector.shape, second_feature_vector_for_send.shape)
         
 
         ## Third model
+        ### split_second_layer_index から 最後の層 (self.num_decoder_layers) まで推論する
         output = edge.infer_third_model(second_feature_vector_for_send, split_second_layer_index)
 
         next_token_logits = output.logits[0, -1, :]
@@ -77,6 +90,28 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
         '''
 
     print(edge.tokenizer.decode(input_ids[0]))
+    total_bit /= 1024 ** 2
+    total_bit_save_bandwidth /= 1024 ** 2
+    print(f'{total_bit=} Mbit, {total_bit_save_bandwidth=} Mbit')
+
+
+# テンソルのシリアル化サイズ(bit)を測定する関数
+def measure_tensor_size_in_memory(
+        tensor: torch.Tensor,
+        library: str = 'numpy'
+    ) -> int:
+    buffer = io.BytesIO()
+
+    if library == 'numpy':
+        tensor = tensor.to('cpu').detach().numpy().copy()
+        np.save(buffer, tensor, allow_pickle=False)
+        
+    elif library == 'torch':
+        torch.save(tensor, buffer)
+
+    byte_size = len(buffer.getvalue())
+    bit_size = byte_size * 8
+    return bit_size
 
 
 if __name__ == '__main__':

@@ -16,14 +16,20 @@ class Cloud(Base):
         super().__init__(first_split_layer_indices, second_split_layer_indices)
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
-        self.get_largest_second_model()
+        self._get_largest_second_model()
 
         # 過去の first_feature_vector を split_layer_index ごとに保存しておく
         self.stored_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
         for split_layer_index in self.first_split_layer_indices:
             self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
 
-    def get_largest_second_model(self):
+        # すでに送信した second_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
+        self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+        for split_layer_index in self.second_split_layer_indices:
+            self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
+
+
+    def _get_largest_second_model(self):
         self.second_model = self.load_model(position='second')
 
         if self.replace_unused_layers_with_identity:
@@ -54,3 +60,17 @@ class Cloud(Base):
             )
 
         return second_feature_vector
+    
+    def get_second_feature_vector_for_send(
+            self,
+            second_feature_vector: torch.HalfTensor,
+            split_second_layer_index: int
+    ) -> torch.HalfTensor:
+        # まだ送信していない past_index のみを取り出す
+        sent_latest_past_index_of_second_feature_vector_with_past = self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index]
+        second_feature_vector_for_send = second_feature_vector[:, sent_latest_past_index_of_second_feature_vector_with_past:, :]
+
+        # latest_past_index の更新
+        self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index] = second_feature_vector.shape[1]
+        
+        return second_feature_vector_for_send
