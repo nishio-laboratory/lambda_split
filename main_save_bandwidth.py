@@ -14,12 +14,6 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
     cloud = Cloud(first_split_layer_indices, second_split_layer_indices)
     edge = Edge(first_split_layer_indices, second_split_layer_indices)
 
-    first_split_layer_indices = sorted(list(first_split_layer_indices))
-    second_split_layer_indices = sorted(list(second_split_layer_indices))
-
-    num_first_split_layer_indices = len(first_split_layer_indices)
-    num_second_split_layer_indices = len(second_split_layer_indices)
-
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
 
@@ -41,8 +35,8 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
         # Triadic split computing : edge -> cloud -> edge
         ## First model
         ### 分割するレイヤ番号を乱数で決める
-        split_first_layer_relative_index = rng.integers(0, num_first_split_layer_indices)
-        split_first_layer_index = first_split_layer_indices[split_first_layer_relative_index]
+        split_first_layer_relative_index = rng.integers(0, edge.num_first_split_layer_indices)
+        split_first_layer_index = edge.first_split_layer_indices[split_first_layer_relative_index]
 
         ### 0 から split_first_layer_index の層まで推論する
         first_feature_vector = edge.infer_first_model(input_ids, split_first_layer_index)
@@ -55,8 +49,8 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
 
         ## Second model
         ### 分割するレイヤ番号を乱数で決める
-        split_second_layer_relative_index = rng.integers(0, num_second_split_layer_indices)
-        split_second_layer_index = second_split_layer_indices[split_second_layer_relative_index]
+        split_second_layer_relative_index = rng.integers(0, cloud.num_second_split_layer_indices)
+        split_second_layer_index = cloud.second_split_layer_indices[split_second_layer_relative_index]
 
         ### split_first_layer_index から split_second_layer_index の層まで推論する
         second_feature_vector = cloud.infer_second_model(first_feature_vector_for_send, split_first_layer_index, split_second_layer_index)
@@ -98,15 +92,19 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
 # テンソルのシリアル化サイズ(bit)を測定する関数
 def measure_tensor_size_in_memory(
         tensor: torch.Tensor,
-        library: str = 'numpy'
+        method: str = 'numpy_save'
     ) -> int:
     buffer = io.BytesIO()
 
-    if library == 'numpy':
-        tensor = tensor.to('cpu').detach().numpy().copy()
+    if method == 'numpy_save':
+        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
         np.save(buffer, tensor, allow_pickle=False)
+
+    elif method == 'numpy_savez_compressed':
+        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
+        np.savez_compressed(buffer, tensor)
         
-    elif library == 'torch':
+    elif method == 'torch':
         torch.save(tensor, buffer)
 
     byte_size = len(buffer.getvalue())

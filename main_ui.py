@@ -56,4 +56,4 @@ if __name__ == '__main__':
         fn=main,
         title='Demo : Triadic Split Computing for LLM'
     ).queue()
-    demo.launch(share=True)
+    demo.launch(ssl_verify=False, server_name='0.0.0.0')

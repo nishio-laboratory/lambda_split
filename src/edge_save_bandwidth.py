@@ -60,7 +60,7 @@ class Edge(Base):
         
         with torch.no_grad():
             first_feature_vector = self.first_model(
-                input_ids, 
+                input_ids=input_ids,
                 split_first_layer_index=split_first_layer_index
             )
 
