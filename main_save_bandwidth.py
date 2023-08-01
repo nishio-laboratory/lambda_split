@@ -7,15 +7,19 @@ from tqdm import tqdm
 
 from src.cloud_save_bandwidth import Cloud
 from src.edge_save_bandwidth import Edge
-from src.util import Prompter
+from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
-    cloud = Cloud(first_split_layer_indices, second_split_layer_indices)
-    edge = Edge(first_split_layer_indices, second_split_layer_indices)
+    split_computing_config = SplitComputingConfig(first_split_layer_indices, second_split_layer_indices)
+    llm_config = LLMConfig()
+    simplified_generation_config = SimplifiedGenerationConfig()
+
+    cloud = Cloud(split_computing_config, llm_config)
+    edge = Edge(split_computing_config, llm_config)
 
     # 乱数生成器
-    rng = np.random.default_rng(random_seed)
+    rng = np.random.default_rng(split_computing_config.random_seed)
 
     instruction = "Tell me about Japan."
     input = None

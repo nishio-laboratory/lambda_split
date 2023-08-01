@@ -20,7 +20,7 @@ class Cloud(Base):
     def get_largest_second_model(self):
         self.second_model = self.load_model(position='second')
 
-        if self.replace_unused_layers_with_identity:
+        if self.do_replace_unused_layers_with_identity:
             # [min_first_split_layer_index, max_second_split_layer_index) 以外を ExtendedIdentity で置き換える
             self.second_model.base_model.model.model.replace_unused_layers_with_identity(
                 min_first_split_layer_index=self.min_first_split_layer_index,

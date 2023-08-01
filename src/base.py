@@ -19,7 +19,7 @@ class Base:
             num_decoder_layers: int = 32,
             num_embed_dims: int = 4096,
             is_max_first_less_than_min_second: bool = True, # メモリがたくさんあるならFalseでいい
-            replace_unused_layers_with_identity: bool = True
+            do_replace_unused_layers_with_identity: bool = True
     ) -> None:
         self.first_split_layer_indices = sorted(list(first_split_layer_indices))
         self.second_split_layer_indices = sorted(list(second_split_layer_indices))
@@ -45,7 +45,7 @@ class Base:
         if is_max_first_less_than_min_second:
             assert self.max_first_split_layer_index <= self.min_second_split_layer_index
 
-        self.replace_unused_layers_with_identity = replace_unused_layers_with_identity
+        self.do_replace_unused_layers_with_identity = do_replace_unused_layers_with_identity
     
         self.load_8bit = load_8bit
         self.base_model = base_model

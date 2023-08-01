@@ -1,19 +1,20 @@
 import copy
+from typing import List
 
 import numpy as np
 import torch
 
 from src.base_save_bandwidth import Base
-
+from src.util import SplitComputingConfig, LLMConfig
 
 class Cloud(Base):
     def __init__(
             self, 
-            first_split_layer_indices: set,
-            second_split_layer_indices: set
+            split_computing_config: SplitComputingConfig,
+            llm_config: LLMConfig
         ) -> None:
         
-        super().__init__(first_split_layer_indices, second_split_layer_indices)
+        super().__init__(split_computing_config, llm_config)
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
         self._get_largest_second_model()
@@ -32,7 +33,7 @@ class Cloud(Base):
     def _get_largest_second_model(self):
         self.second_model = self.load_model(position='second')
 
-        if self.replace_unused_layers_with_identity:
+        if self.do_replace_unused_layers_with_identity:
             # [min_first_split_layer_index, max_second_split_layer_index) 以外を ExtendedIdentity で置き換える
             self.second_model.base_model.model.model.replace_unused_layers_with_identity(
                 min_first_split_layer_index=self.min_first_split_layer_index,

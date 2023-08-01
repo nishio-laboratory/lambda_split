@@ -27,7 +27,7 @@ class Edge(Base):
     def get_largest_first_model(self) -> None:
         self.first_model = self.load_model(position='first')
 
-        if self.replace_unused_layers_with_identity:
+        if self.do_replace_unused_layers_with_identity:
             # [0, max_first_split_layer_index) 以外を ExtendedIdentity で置き換える
             self.first_model.base_model.model.model.replace_unused_layers_with_identity(
                 max_first_split_layer_index=self.max_first_split_layer_index
@@ -36,7 +36,7 @@ class Edge(Base):
     def get_largest_third_model(self) -> None:
         self.third_model = self.load_model(position='third')
 
-        if self.replace_unused_layers_with_identity:
+        if self.do_replace_unused_layers_with_identity:
             # [min_second_split_layer_index, self.num_decoder_layers) 以外を ExtendedIdentity で置き換える
             self.third_model.base_model.model.model.replace_unused_layers_with_identity(
                 min_second_split_layer_index=self.min_second_split_layer_index
