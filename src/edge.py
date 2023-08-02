@@ -79,7 +79,7 @@ class Edge(Base):
                 split_first_layer_index=split_first_layer_index
             )
 
-        if self.split_computing_config.use_split_cache:
+        if self.split_computing_config.use_split_sent_cache:
             # すでに送信した past_index を削除する
             first_feature_vector_for_send = self._delete_already_sent_first_feature_vector_indices(
                 first_feature_vector=first_feature_vector,
@@ -151,7 +151,7 @@ class Edge(Base):
             print(f"Communication latency : {wait_time} seconds")
             time.sleep(wait_time)
 
-        if self.split_computing_config.use_split_cache:
+        if self.split_computing_config.use_split_sent_cache:
             self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index] = torch.cat((
                 self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index], 
                 second_feature_vector_for_send), 

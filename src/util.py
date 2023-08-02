@@ -13,7 +13,7 @@ class SplitComputingConfig(object):
             first_split_layer_indices: list,
             second_split_layer_indices: list,
             random_seed: int = 42,
-            use_split_cache: bool = True,
+            use_split_sent_cache: bool = True,
             measure_tensor_size_method: bool = 'numpy_save',
             is_max_first_less_than_min_second: bool = True,
             do_replace_unused_layers_with_identity: bool = True,
@@ -31,7 +31,7 @@ class SplitComputingConfig(object):
         self.first_split_layer_indices = first_split_layer_indices
         self.second_split_layer_indices = second_split_layer_indices
         self.random_seed = random_seed
-        self.use_split_cache = use_split_cache
+        self.use_split_sent_cache = use_split_sent_cache
         self.measure_tensor_size_method = measure_tensor_size_method
         self.is_max_first_less_than_min_second = is_max_first_less_than_min_second
         self.do_replace_unused_layers_with_identity = do_replace_unused_layers_with_identity
@@ -61,7 +61,7 @@ class SimplifiedGenerationConfig(GenerationConfig):
             self,
             max_new_tokens: int = None,
             do_sample: bool = False,
-            use_past_cache: bool = True,
+            use_split_past_cache: bool = False,
             temperature: float = 1.0,
             top_k: int = 50,
             top_p: float = 1.0
@@ -71,7 +71,7 @@ class SimplifiedGenerationConfig(GenerationConfig):
 
         # Parameters that control the generation strategy used
         self.do_sample = do_sample
-        self.use_past_cache = use_past_cache
+        self.use_split_past_cache = use_split_past_cache
 
         # Parameters for manipulation of the model output logits
         self.temperature = temperature

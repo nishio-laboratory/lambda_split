@@ -22,7 +22,7 @@ class Cloud(Base):
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
         self.second_model = self._get_largest_second_model()
 
-        if self.split_computing_config.use_split_cache:
+        if self.split_computing_config.use_split_sent_cache:
         # 過去の first_feature_vector を split_layer_index ごとに保存しておく
             self.stored_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
             for split_layer_index in self.first_split_layer_indices:
@@ -54,7 +54,7 @@ class Cloud(Base):
     ) -> torch.Tensor:
         first_feature_vector_for_send = first_feature_vector_for_send.to(self.device).half()
 
-        if self.split_computing_config.use_split_cache:
+        if self.split_computing_config.use_split_sent_cache:
             self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index] = torch.cat((
                 self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index], 
                 first_feature_vector_for_send), 
@@ -71,7 +71,7 @@ class Cloud(Base):
                 split_second_layer_index=split_second_layer_index
             )
 
-        if self.split_computing_config.use_split_cache:
+        if self.split_computing_config.use_split_sent_cache:
             second_feature_vector_for_send = self._delete_already_sent_second_feature_vector_indices(
                 second_feature_vector=second_feature_vector,
                 split_second_layer_index=split_second_layer_index

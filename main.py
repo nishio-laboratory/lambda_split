@@ -18,7 +18,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed):
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_cache=True,
+        use_split_sent_cache=True,
     )
 
     # Cloud での SplitComputingConfig
@@ -27,7 +27,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed):
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_cache=True,
+        use_split_sent_cache=True,
     )
 
     # LLM の Config
