@@ -40,7 +40,7 @@ class FirstLlamaModel(LlamaModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.HalfTensor:
+    ) -> torch.Tensor:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -190,7 +190,7 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.HalfTensor:
+    ) -> torch.Tensor:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -267,7 +267,7 @@ class SecondLlamaModel(LlamaModel):
         
     def forward(
         self,
-        input_ids: torch.HalfTensor = None,
+        input_ids: torch.Tensor = None,
         split_first_layer_index: int = None,
         split_second_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -278,7 +278,7 @@ class SecondLlamaModel(LlamaModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.HalfTensor:
+    ) -> torch.Tensor:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -417,7 +417,7 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
 
     def forward(
         self,
-        input_ids: torch.HalfTensor = None,
+        input_ids: torch.Tensor = None,
         split_first_layer_index: int = None,
         split_second_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -429,7 +429,7 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.HalfTensor:
+    ) -> torch.Tensor:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -503,7 +503,7 @@ class ThirdLlamaModel(LlamaModel):
 
     def forward(
         self,
-        input_ids: torch.HalfTensor = None,
+        input_ids: torch.Tensor = None,
         split_second_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
@@ -648,7 +648,7 @@ class ThirdLlamaForCausalLM(LlamaForCausalLM):
 
     def forward(
         self,
-        input_ids: torch.HalfTensor = None,
+        input_ids: torch.Tensor = None,
         split_second_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,

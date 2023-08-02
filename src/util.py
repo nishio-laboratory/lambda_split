@@ -1,16 +1,20 @@
-
-
+import io
 from typing import Union
+
+import torch
+import numpy as np
 from transformers import GenerationConfig
 
 
 class SplitComputingConfig(object):
     def __init__(
             self,
+            device: str,
             first_split_layer_indices: list,
             second_split_layer_indices: list,
             random_seed: int = 42,
             use_split_cache: bool = True,
+            measure_tensor_size_method: bool = 'numpy_save',
             is_max_first_less_than_min_second: bool = True,
             do_replace_unused_layers_with_identity: bool = True,
             wait_latency: bool = False,
@@ -19,10 +23,16 @@ class SplitComputingConfig(object):
             quantize_method: str = None,
             save_split_model_output_to_file: bool = False
     ) -> None:
+        if wait_latency:
+            assert measure_tensor_size_method is not None
+            assert bandwidth is not None
+
+        self.device = device
         self.first_split_layer_indices = first_split_layer_indices
         self.second_split_layer_indices = second_split_layer_indices
         self.random_seed = random_seed
         self.use_split_cache = use_split_cache
+        self.measure_tensor_size_method = measure_tensor_size_method
         self.is_max_first_less_than_min_second = is_max_first_less_than_min_second
         self.do_replace_unused_layers_with_identity = do_replace_unused_layers_with_identity
         self.wait_latency = wait_latency
@@ -72,7 +82,7 @@ class SimplifiedGenerationConfig(GenerationConfig):
         self,
         config: GenerationConfig
     ) -> None:
-                # Parameters that control the length of the output
+        # Parameters that control the length of the output
         self.max_new_tokens = config.max_new_tokens
 
         # Parameters that control the generation strategy used
@@ -134,3 +144,27 @@ class Prompter(object):
 
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
+    
+
+
+# テンソルのシリアル化サイズ(bit)を測定する関数
+def measure_tensor_size(
+        tensor: torch.Tensor,
+        method: str = 'numpy_save'
+    ) -> int:
+    buffer = io.BytesIO()
+
+    if method == 'numpy_save':
+        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
+        np.save(buffer, tensor, allow_pickle=False)
+
+    elif method == 'numpy_savez_compressed':
+        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
+        np.savez_compressed(buffer, tensor)
+        
+    elif method == 'torch':
+        torch.save(tensor, buffer)
+
+    byte_size = len(buffer.getvalue())
+    bit_size = byte_size * 8
+    return bit_size
