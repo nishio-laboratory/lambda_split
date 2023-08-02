@@ -5,25 +5,27 @@ import numpy as np
 import torch
 
 from src.base import Base
-from src.util import SplitComputingConfig, LLMConfig
+from src.util import SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig
 
 
 class Cloud(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            llm_config: LLMConfig
+            llm_config: LLMConfig,
+            simplified_generation_config: SimplifiedGenerationConfig
         ) -> None:
         
         super().__init__(split_computing_config, llm_config)
 
         self.split_computing_config = split_computing_config
+        self.simplied_generation_config = simplified_generation_config
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
         self.second_model = self._get_largest_second_model()
 
         if self.split_computing_config.use_split_cache:
-        # 過去の first_feature_vector を split_layer_index ごとに保存しておく
+            # 過去の first_feature_vector を split_layer_index ごとに保存しておく
             self.stored_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
             for split_layer_index in self.first_split_layer_indices:
                 self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
@@ -68,7 +70,8 @@ class Cloud(Base):
             second_feature_vector = self.second_model(
                 inputs_embeds=first_feature_vector, 
                 split_first_layer_index=split_first_layer_index, 
-                split_second_layer_index=split_second_layer_index
+                split_second_layer_index=split_second_layer_index,
+                use_cache=self.simplied_generation_config.use_past_cache
             )
 
         if self.split_computing_config.use_split_cache:

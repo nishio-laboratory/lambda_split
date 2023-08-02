@@ -88,7 +88,7 @@ class SimplifiedGenerationConfig(GenerationConfig):
         # Parameters that control the generation strategy used
         self.do_sample = config.do_sample
         self.num_beams = config.num_beams
-        self.use_cache = config.use_cache
+        self.use_past_cache = config.use_cache
 
         # Parameters for manipulation of the model output logits
         self.temperature = config.temperature
@@ -168,3 +168,17 @@ def measure_tensor_size(
     byte_size = len(buffer.getvalue())
     bit_size = byte_size * 8
     return bit_size
+
+
+
+def print_tuple_nested_tensor_shapes(nested_tuple, path=()):
+    if nested_tuple is None:
+        return
+    
+    for i, item in enumerate(nested_tuple):
+        current_path = path + (i,)
+        if isinstance(item, torch.Tensor):
+            print(f'Path in the tuple: {current_path}, Tensor shape: {item.shape}')
+        elif isinstance(item, tuple):
+            print(f'Path in the tuple: {current_path}')
+            print_tuple_nested_tensor_shapes(item, current_path)

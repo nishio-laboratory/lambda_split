@@ -36,14 +36,16 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed):
         lora_weights="tloen/alpaca-lora-7b"
     )
 
-    # Edge と Cloud のインスタンス
-    edge = Edge(split_computing_config_edge, llm_config)
-    cloud = Cloud(split_computing_config_cloud, llm_config)
-
     # テキスト生成の Config
     simplified_generation_config = SimplifiedGenerationConfig(
-        max_new_tokens=100
+        max_new_tokens=100,
+        use_past_cache=True
     )
+    
+
+    # Edge と Cloud のインスタンス
+    edge = Edge(split_computing_config_edge, llm_config, simplified_generation_config)
+    cloud = Cloud(split_computing_config_cloud, llm_config, simplified_generation_config)
 
     # 乱数生成器
     rng = np.random.default_rng(random_seed)

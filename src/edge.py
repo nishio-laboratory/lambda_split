@@ -8,19 +8,21 @@ from transformers import LlamaTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
-from src.util import SplitComputingConfig, LLMConfig, measure_tensor_size
+from src.util import SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, measure_tensor_size
 
 
 class Edge(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            llm_config: LLMConfig
+            llm_config: LLMConfig,
+            simplified_generation_config: SimplifiedGenerationConfig
         ) -> None:
         
         super().__init__(split_computing_config, llm_config)
 
         self.split_computing_config = split_computing_config
+        self.simplied_generation_config = simplified_generation_config
         self.tokenizer = LlamaTokenizer.from_pretrained(llm_config.base_model)
         self.tokenizer.pad_token_id = 0 # unk
 
@@ -28,15 +30,20 @@ class Edge(Base):
         self.first_model = self._get_largest_first_model()
         self.third_model = self._get_largest_third_model()
 
-        # すでに送信した first_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
-        self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
-        for split_layer_index in self.second_split_layer_indices:
-            self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
+        if self.split_computing_config.use_split_cache:
+            # すでに送信した first_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
+            self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            for split_layer_index in self.second_split_layer_indices:
+                self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
 
-        # 過去の second_feature_vector_with_past を split_layer_index ごとに保存しておく
-        self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
-        for split_layer_index in self.second_split_layer_indices:
-            self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
+            # 過去の second_feature_vector_with_past を split_layer_index ごとに保存しておく
+            self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            for split_layer_index in self.second_split_layer_indices:
+                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
+
+        # use_past_cache の場合に使う
+        self.first_past_key_values = None
+        self.first_past_key_values_length_for_each_split_layer_index = [0 for _ in range(self.num_decoder_layers)]
 
         # 送受信テンソルのサイズを保存しておく
         if self.split_computing_config.measure_tensor_size_method is not None:
@@ -74,10 +81,20 @@ class Edge(Base):
 
         # first_model の推論
         with torch.no_grad():
-            first_feature_vector = self.first_model(
+            first_split_model_output = self.first_model(
                 input_ids=input_ids,
-                split_first_layer_index=split_first_layer_index
+                split_first_layer_index=split_first_layer_index,
+                use_cache=self.simplied_generation_config.use_past_cache,
+                past_key_values=self.first_past_key_values,
+                past_key_values_length_for_each_split_layer_index=self.first_past_key_values_length_for_each_split_layer_index
             )
+
+        print(first_split_model_output)
+
+        first_feature_vector = first_split_model_output.feature_vector
+        self.first_past_key_values = first_split_model_output.past_key_values
+        self.first_past_key_values_length_for_each_split_layer_index = first_split_model_output.past_key_values_length_for_each_split_layer_index
+
 
         if self.split_computing_config.use_split_cache:
             # すでに送信した past_index を削除する
@@ -164,7 +181,8 @@ class Edge(Base):
         with torch.no_grad():
             output = self.third_model(
                 inputs_embeds=second_feature_vector, 
-                split_second_layer_index=split_second_layer_index
+                split_second_layer_index=split_second_layer_index,
+                use_cache=self.simplied_generation_config.use_past_cache
             )
 
         return output
