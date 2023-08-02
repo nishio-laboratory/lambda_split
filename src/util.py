@@ -35,11 +35,9 @@ class SplitComputingConfig(object):
 class LLMConfig(object):
     def __init__(
         self,
-        load_8bit: bool = False,
         base_model: str = 'huggyllama/llama-7b',
         lora_weights: str = "tloen/alpaca-lora-7b"
     ) -> None:
-        self.load_8bit = load_8bit
         self.base_model = base_model
         self.lora_weights = lora_weights
         

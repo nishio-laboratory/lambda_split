@@ -10,7 +10,7 @@ from src.edge_save_bandwidth import Edge
 from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig
 
 
-def main(first_split_layer_indices, second_split_layer_indices, random_seed=42):
+def main(first_split_layer_indices, second_split_layer_indices):
     split_computing_config = SplitComputingConfig(first_split_layer_indices, second_split_layer_indices)
     llm_config = LLMConfig()
     simplified_generation_config = SimplifiedGenerationConfig()

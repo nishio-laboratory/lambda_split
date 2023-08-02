@@ -27,7 +27,6 @@ class Base:
         self.num_first_split_layer_indices = len(self.first_split_layer_indices)
         self.num_second_split_layer_indices = len(self.second_split_layer_indices)
 
-        self.load_8bit = llm_config.load_8bit
         self.base_model = llm_config.base_model
         self.lora_weights = llm_config.lora_weights
 
@@ -70,7 +69,6 @@ class Base:
         if self.device == "cuda":
             model = position_model.from_pretrained(
                 self.base_model,
-                load_in_8bit=self.load_8bit,
                 torch_dtype=torch.float16,
                 device_map="auto",
             )
@@ -109,9 +107,6 @@ class Base:
         model.config.pad_token_id = 0  # unk
         model.config.bos_token_id = 1
         model.config.eos_token_id = 2
-
-        if not self.load_8bit:
-            model.half()  # seems to fix bugs for some users.
 
         model.eval()
         
