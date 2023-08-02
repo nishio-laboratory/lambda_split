@@ -87,7 +87,7 @@ class Cloud(Base):
             )
 
         if self.split_computing_config.quantize_method is not None:
-            pass # TODO
+            raise NotImplementedError
 
         return second_feature_vector_for_send
     

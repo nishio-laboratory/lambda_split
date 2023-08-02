@@ -78,6 +78,9 @@ class SimplifiedGenerationConfig(GenerationConfig):
         self.top_k = top_k
         self.top_p = top_p
 
+        if self.use_split_past_cache:
+            raise NotImplementedError
+
     def from_generation_config(
         self,
         config: GenerationConfig
@@ -96,6 +99,9 @@ class SimplifiedGenerationConfig(GenerationConfig):
         self.top_p = config.top_p
 
         assert self.num_beams == 1
+
+        if self.use_split_past_cache:
+            raise NotImplementedError
 
 
 class Prompter(object):

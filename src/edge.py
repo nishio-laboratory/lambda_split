@@ -98,7 +98,7 @@ class Edge(Base):
 
         # 量子化
         if self.split_computing_config.quantize_method is not None:
-            pass # TODO
+            raise NotImplementedError
 
         # テンソルサイズ (bit) を計測
         if self.split_computing_config.measure_tensor_size_method is not None:
