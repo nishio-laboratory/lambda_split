@@ -3,6 +3,7 @@ from typing import Union
 
 import torch
 import numpy as np
+import torch.nn.functional as F
 from transformers import GenerationConfig
 
 
@@ -60,11 +61,11 @@ class SimplifiedGenerationConfig(GenerationConfig):
     def __init__(
             self,
             max_new_tokens: int = None,
-            do_sample: bool = False,
+            do_sample: bool = True,
             use_split_past_cache: bool = False,
             temperature: float = 1.0,
             top_k: int = 50,
-            top_p: float = 1.0
+            top_p: float = 0.9
         ) -> None:
         # Parameters that control the length of the output
         self.max_new_tokens = max_new_tokens
@@ -174,3 +175,48 @@ def measure_tensor_size(
     byte_size = len(buffer.getvalue())
     bit_size = byte_size * 8
     return bit_size
+
+
+# ロジットから次のトークンを選択する関数
+def select_next_token(
+        logits: torch.Tensor,
+        config: SimplifiedGenerationConfig
+    ) -> torch.Tensor:
+    do_sample = config.do_sample
+    temperature = config.temperature
+    top_k = config.top_k
+    top_p = config.top_p
+
+    # If top_k is not provided, consider all tokens
+    if top_k is None:
+        top_k = logits.shape[-1]
+    
+    # Apply temperature if given
+    logits = logits / temperature
+
+    # Apply top-k sampling
+    top_k_logits, top_k_indices = logits.topk(top_k, dim=-1)
+    if do_sample:
+        probs = F.softmax(top_k_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+    else:
+        next_token = top_k_indices[:, 0]
+
+    # Apply nucleus (top-p) sampling
+    if top_p < 1.0:
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        sorted_indices_to_remove = cumulative_probs > top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+        logits[indices_to_remove] = float('-inf')
+
+        # Sample from the logits
+        if do_sample:
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+        else:
+            next_token = torch.argmax(logits, dim=-1)
+
+    return next_token

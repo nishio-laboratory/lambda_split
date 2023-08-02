@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig
+from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, select_next_token
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed):
@@ -42,7 +42,12 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed):
 
     # テキスト生成の Config
     simplified_generation_config = SimplifiedGenerationConfig(
-        max_new_tokens=100
+        max_new_tokens=500,
+        do_sample=True,
+        use_split_past_cache=False,
+        temperature=1,
+        top_k=50,
+        top_p=0.9
     )
 
     # 乱数生成器
@@ -80,14 +85,13 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed):
         output = edge.infer_third_model(second_feature_vector_for_send, split_second_layer_index)
 
         ## 推論結果のロジットから次のトークンを選択する
-        next_token_logits = output.logits[0, -1, :]
-        next_token_probs = torch.softmax(next_token_logits, dim=-1)
-        sorted_ids = torch.argsort(next_token_probs, descending=True, dim=-1)
+        logits = output.logits[0, -1, :]
+        next_token = select_next_token(logits, simplified_generation_config)
         
-        if sorted_ids[0] == edge.tokenizer.eos_token_id:
+        if next_token == edge.tokenizer.eos_token_id:
             break
-
-        input_ids = torch.cat([input_ids, sorted_ids[None, 0, None]], dim=-1)
+        
+        input_ids = torch.cat([input_ids, next_token.unsqueeze(0)], dim=-1)
 
         '''
         with open(f'torchinfo_summary_log/first_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
