@@ -12,7 +12,7 @@ from src.edge import Edge
 from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, select_next_token
 
 
-def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui):
+def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
     # Edge での SplitComputingConfig
     split_computing_config_edge = SplitComputingConfig(
         device='cuda',
@@ -114,7 +114,8 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
             
             input_ids = torch.cat([input_ids, next_token.unsqueeze(0)], dim=-1)
 
-            yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
+            if show_ui:
+                yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
 
 
         print(edge.tokenizer.decode(input_ids[0]))
@@ -138,7 +139,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
         cloud.reset_split_sent_cache()
 
 
-    if ui:
+    if show_ui:
         with gr.Blocks() as demo:
             max_new_tokens = gr.Slider(minimum=1, maximum=500, value=200, step=1, label="max_new_tokens", interactive=True)
             do_sample = gr.Checkbox(value=True, label="do_sample", interactive=True)
@@ -148,7 +149,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
             gr.ChatInterface(
                 fn=infer,
                 additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p],
-                title='Demo : Triadic Split Computing for LLaMa 7B'
+                title='Demo : Triadic Split Computing for LLaMa 13B'
             )
 
         demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')

@@ -188,8 +188,10 @@ def select_next_token(
     top_k = config.top_k
     top_p = config.top_p
 
+    assert len(logits.shape) == 1
+
     if not do_sample:
-        next_token = torch.argmax(logits, dim=-1)
+        next_token = torch.argmax(logits, dim=-1).unsqueeze(0)
         return next_token
 
     # If top_k is not provided, consider all tokens
@@ -203,16 +205,13 @@ def select_next_token(
     sorted_logits, sorted_indices = torch.sort(logits, descending=True)
     cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
     sorted_indices_to_remove = cumulative_probs > top_p
-    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-    sorted_indices_to_remove[..., 0] = 0
-    indices_to_remove = sorted_indices[sorted_indices_to_remove]
-    logits[indices_to_remove] = float('-inf')
+    sorted_logits[sorted_indices_to_remove] = float('-inf')
+    logits = sorted_logits.scatter(dim=-1, index=sorted_indices, src=sorted_logits)
 
     # Apply top-k sampling
     top_k_logits, top_k_indices = logits.topk(top_k, dim=-1)
     probs = F.softmax(top_k_logits, dim=-1)
     next_token = torch.multinomial(probs, num_samples=1)
-    next_token = top_k_indices[:, 0]
 
     return next_token
 
