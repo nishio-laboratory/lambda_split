@@ -4,11 +4,12 @@ import time
 
 import numpy as np
 import torch
-from transformers import LlamaTokenizer
+import torch.nn.functional as F
+from transformers import LlamaTokenizer, LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
-from src.util import SplitComputingConfig, LLMConfig, measure_tensor_size
+from src.util import SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, measure_tensor_size
 
 
 class Edge(Base):
@@ -172,3 +173,51 @@ class Edge(Base):
             )
 
         return output
+
+    # ロジットから次のトークンを選択する
+    def select_next_token(
+            self,
+            logits: torch.Tensor,
+            config: SimplifiedGenerationConfig
+        ) -> torch.Tensor:
+        do_sample = config.do_sample
+        temperature = config.temperature
+        top_k = config.top_k
+        top_p = config.top_p
+
+        next_token_logits = logits[:, -1, :]
+
+        if not do_sample:
+            # Greedy decoding
+            next_tokens = torch.argmax(next_token_logits, dim=-1)[:, None]
+            return next_tokens
+        
+        # Apply temperature if given
+        next_token_logits = next_token_logits / temperature
+
+        # Apply nucleus (top-p) sampling
+        if top_p is not None and top_p < 1.0:
+            sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+            cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above the threshold
+            sorted_indices_to_remove = cumulative_probs > top_p
+            # Shift the indices to the right to keep also the first token above the threshold
+            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+            sorted_indices_to_remove[..., 0] = 0
+
+            # scatter sorted tensors to original indexing
+            indices_to_remove = sorted_indices_to_remove.scatter(dim=1, index=sorted_indices, src=sorted_indices_to_remove)
+            next_token_logits[indices_to_remove] = float('-inf')
+
+        # Apply top-k sampling
+        if top_k > 0:
+            # Remove all tokens with a probability less than the last token of the top-k
+            indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+            next_token_logits[indices_to_remove] = float('-inf')
+
+        # Sample from the filtered distribution
+        probs = F.softmax(next_token_logits, dim=-1)
+        next_tokens = torch.multinomial(probs, num_samples=1)[:, None, 0]
+
+        return next_tokens

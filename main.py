@@ -3,13 +3,12 @@ import time
 
 import numpy as np
 import torch
-import torchinfo
 from tqdm import tqdm
 import gradio as gr
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, select_next_token
+from src.util import Prompter, SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
@@ -106,16 +105,16 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             output = edge.infer_third_model(second_feature_vector_for_send, split_second_layer_index)
 
             ## 推論結果のロジットから次のトークンを選択する
-            logits = output.logits[0, -1, :]
-            next_token = select_next_token(logits, simplified_generation_config)
+            next_tokens = edge.select_next_token(output.logits, simplified_generation_config)
             
-            if next_token == edge.tokenizer.eos_token_id:
+            # EOS トークンが生成されたら終了する
+            if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
                 break
             
-            input_ids = torch.cat([input_ids, next_token.unsqueeze(0)], dim=-1)
+            # 次のトークンを input_ids に追加する
+            input_ids = torch.cat([input_ids, next_tokens], dim=-1)
 
-            if show_ui:
-                yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
+            yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
 
 
         print(edge.tokenizer.decode(input_ids[0]))
@@ -146,6 +145,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             temperature = gr.Slider(minimum=0.1, maximum=10, value=1, label="temperature", interactive=True)
             top_k = gr.Slider(minimum=1, maximum=1000, value=50, step=1, label="top_k", interactive=True)
             top_p = gr.Slider(minimum=0, maximum=1, value=0.9, label="top_p", interactive=True)
+
             gr.ChatInterface(
                 fn=infer,
                 additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p],
@@ -156,8 +156,17 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
     else:
         while True:
-            message = input('Instruction : ') # "Tell me about Japan."
-            infer(message, None)
+            message = input('Instruction : ')
+            for response in infer(
+                message, 
+                None, 
+                simplified_generation_config.max_new_tokens, 
+                simplified_generation_config.do_sample, 
+                simplified_generation_config.temperature, 
+                simplified_generation_config.top_k, 
+                simplified_generation_config.top_p
+            ):
+                print(response)
             
 
 if __name__ == '__main__':
