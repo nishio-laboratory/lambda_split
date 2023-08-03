@@ -63,7 +63,17 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
 
-    def infer(message, history):
+    def infer(message, history, max_new_tokens, do_sample, temperature, top_k, top_p):
+        # テキスト生成の Config
+        simplified_generation_config = SimplifiedGenerationConfig(
+            max_new_tokens=max_new_tokens,
+            do_sample=do_sample,
+            use_split_past_cache=False,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p
+        )
+
         inference_instruction = message
         inference_input = None
         prompter = Prompter('')
@@ -106,20 +116,14 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
 
             yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
 
-            '''
-            with open(f'torchinfo_summary_log/first_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
-                f.write(repr(torchinfo.summary(edge.first_model, input_data=input_ids, depth=10, col_width=50)))
-            with open(f'torchinfo_summary_log/second_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
-                f.write(repr(torchinfo.summary(cloud.second_model, input_data=first_feature_vector, depth=10, col_width=50)))
-            with open(f'torchinfo_summary_log/third_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
-                f.write(repr(torchinfo.summary(edge.third_model, input_data=second_feature_vector, depth=10, col_width=50)))
-            '''
 
         print(edge.tokenizer.decode(input_ids[0]))
         print()
 
         end = time.time()
         print(f'Inference time : {end - start} seconds')
+        print(f'Number of generated tokens : {idx} tokens')
+        print(f'Tokens per second : {(end - start) / idx} tps')
 
         if split_computing_config_edge.measure_tensor_size_method is not None:
             total_bit_send = sum(edge.send_tensor_size_list) / (1024 ** 2)
@@ -135,11 +139,19 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, ui)
 
 
     if ui:
-        demo = gr.ChatInterface(
-            fn=infer,
-            title='Demo : Triadic Split Computing for LLM'
-        ).queue()
-        demo.launch(ssl_verify=False, server_name='0.0.0.0')
+        with gr.Blocks() as demo:
+            max_new_tokens = gr.Slider(minimum=1, maximum=500, value=200, step=1, label="max_new_tokens", interactive=True)
+            do_sample = gr.Checkbox(value=True, label="do_sample", interactive=True)
+            temperature = gr.Slider(minimum=0.1, maximum=10, value=1, label="temperature", interactive=True)
+            top_k = gr.Slider(minimum=1, maximum=1000, value=50, step=1, label="top_k", interactive=True)
+            top_p = gr.Slider(minimum=0, maximum=1, value=0.9, label="top_p", interactive=True)
+            gr.ChatInterface(
+                fn=infer,
+                additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p],
+                title='Demo : Triadic Split Computing for LLaMa 7B'
+            )
+
+        demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
 
     else:
         while True:

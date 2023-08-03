@@ -4,6 +4,7 @@ from typing import Union
 import torch
 import numpy as np
 import torch.nn.functional as F
+import torchinfo
 from transformers import GenerationConfig
 
 
@@ -220,3 +221,13 @@ def select_next_token(
             next_token = torch.argmax(logits, dim=-1)
 
     return next_token
+
+
+
+def export_torchinfo_summary(edge, cloud, input_ids):
+    with open(f'torchinfo_summary_log/first_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt', 'w') as f:
+        f.write(repr(torchinfo.summary(edge.first_model, input_data=input_ids, depth=10, col_width=50)))
+    with open(f'torchinfo_summary_log/second_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt', 'w') as f:
+        f.write(repr(torchinfo.summary(cloud.second_model, input_data=first_feature_vector, depth=10, col_width=50)))
+    with open(f'torchinfo_summary_log/third_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
+        f.write(repr(torchinfo.summary(edge.third_model, input_data=second_feature_vector, depth=10, col_width=50)))
