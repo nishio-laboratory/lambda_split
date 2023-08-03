@@ -28,6 +28,10 @@ class Edge(Base):
         self.first_model = self._get_largest_first_model()
         self.third_model = self._get_largest_third_model()
 
+        if self.split_computing_config.use_split_sent_cache:
+            self.reset_split_sent_cache()
+
+    def reset_split_sent_cache(self):
         # すでに送信した first_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
         self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
         for split_layer_index in self.second_split_layer_indices:

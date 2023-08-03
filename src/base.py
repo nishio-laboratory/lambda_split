@@ -33,6 +33,15 @@ class Base:
         if self.base_model == 'huggyllama/llama-7b':
             self.num_decoder_layers = 32
             self.num_embed_dims = 4096
+
+        elif self.base_model == 'huggyllama/llama-13b':
+            self.num_decoder_layers = 40
+            self.num_embed_dims = 5120
+
+        elif self.base_model == 'huggyllama/llama-30b':
+            self.num_decoder_layers = 60
+            self.num_embed_dims = 6556
+
         
         assert 0 <= self.min_first_split_layer_index
         assert self.max_first_split_layer_index <= self.num_decoder_layers
