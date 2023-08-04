@@ -145,16 +145,22 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
     if show_ui:
         with gr.Blocks() as demo:
             gr.Markdown(f"<h1><center>Demo : Triadic Split Computing for {base_model}</center></h1>")
-            max_new_tokens = gr.Slider(minimum=1, maximum=500, value=250, step=1, label="max_new_tokens", interactive=True)
-            do_sample = gr.Checkbox(value=True, label="do_sample", interactive=True)
-            temperature = gr.Slider(minimum=0.1, maximum=10, value=1, label="temperature", interactive=True)
-            top_k = gr.Slider(minimum=1, maximum=1000, value=50, step=1, label="top_k", interactive=True)
-            top_p = gr.Slider(minimum=0, maximum=1, value=0.9, label="top_p", interactive=True)
 
-            gr.ChatInterface(
-                fn=infer,
-                additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p]
-            )
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown(f"<center>Text Generation Config</center>")
+
+                    max_new_tokens = gr.Slider(minimum=1, maximum=500, value=250, step=1, label="max_new_tokens", interactive=True)
+                    do_sample = gr.Checkbox(value=True, label="do_sample", interactive=True)
+                    temperature = gr.Slider(minimum=0.1, maximum=5, value=1, label="temperature", interactive=True)
+                    top_k = gr.Slider(minimum=1, maximum=1000, value=50, step=1, label="top_k", interactive=True)
+                    top_p = gr.Slider(minimum=0, maximum=1, value=0.9, label="top_p", interactive=True)
+
+                with gr.Column(scale=3):
+                    gr.ChatInterface(
+                        fn=infer,
+                        additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p]
+                    )
 
         demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
 
