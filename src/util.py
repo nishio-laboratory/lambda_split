@@ -1,106 +1,55 @@
 import io
 from typing import Union
+from dataclasses import dataclass
+import os
 
 import torch
 import numpy as np
 import torchinfo
-from transformers import GenerationConfig
 
 
+@dataclass
 class SplitComputingConfig(object):
-    def __init__(
-            self,
-            device: str,
-            first_split_layer_indices: list,
-            second_split_layer_indices: list,
-            random_seed: int = 42,
-            use_split_sent_cache: bool = True,
-            measure_tensor_size_method: bool = 'numpy_save',
-            is_max_first_less_than_min_second: bool = True,
-            do_replace_unused_layers_with_identity: bool = True,
-            wait_latency: bool = False,
-            bandwidth: int = None,
-            dropout_rate: float = 1.0,
-            quantize_method: str = None,
-            save_split_model_output_to_file: bool = False
-    ) -> None:
-        if wait_latency:
-            assert measure_tensor_size_method is not None
-            assert bandwidth is not None
+    device: str
+    first_split_layer_indices: list
+    second_split_layer_indices: list
+    random_seed: int = 42
+    use_split_sent_cache: bool = True
+    do_shuffle: bool = True
+    measure_tensor_size_method: bool = 'numpy_save'
+    is_max_first_less_than_min_second: bool = True
+    do_replace_unused_layers_with_identity: bool = True
+    wait_latency: bool = False
+    bandwidth: int = None
+    dropout_rate: float = 1.0
+    quantize_method: str = None
+    save_split_model_output_to_file: bool = False
 
-        self.device = device
-        self.first_split_layer_indices = first_split_layer_indices
-        self.second_split_layer_indices = second_split_layer_indices
-        self.random_seed = random_seed
-        self.use_split_sent_cache = use_split_sent_cache
-        self.measure_tensor_size_method = measure_tensor_size_method
-        self.is_max_first_less_than_min_second = is_max_first_less_than_min_second
-        self.do_replace_unused_layers_with_identity = do_replace_unused_layers_with_identity
-        self.wait_latency = wait_latency
-        self.bandwidth = bandwidth
-        self.dropout_rate = dropout_rate
-        self.quantize_method = quantize_method
-        self.save_split_model_output_to_file = save_split_model_output_to_file
-
-
-class LLMConfig(object):
-    def __init__(
-        self,
-        base_model: str = 'huggyllama/llama-7b',
-        lora_weights: str = "tloen/alpaca-lora-7b"
-    ) -> None:
-        self.base_model = base_model
-        self.lora_weights = lora_weights
+    def __post_init__(self):
+        if self.wait_latency:
+            assert self.measure_tensor_size_method is not None
+            assert self.bandwidth is not None
         
 
-class SimplifiedGenerationConfig(GenerationConfig):
+@dataclass
+class SimplifiedGenerationConfig(object):
     '''
     The original program was provided on the following page.
     https://github.com/huggingface/transformers/blob/v4.30.0/src/transformers/generation/configuration_utils.py#L38
     '''
-    def __init__(
-            self,
-            max_new_tokens: int = None,
-            do_sample: bool = True,
-            use_split_past_cache: bool = False,
-            temperature: float = 1.0,
-            top_k: int = 50,
-            top_p: float = 0.9
-        ) -> None:
-        # Parameters that control the length of the output
-        self.max_new_tokens = max_new_tokens
+    # Parameters that control the length of the output
+    max_new_tokens: int = None
 
-        # Parameters that control the generation strategy used
-        self.do_sample = do_sample
-        self.use_split_past_cache = use_split_past_cache
+    # Parameters that control the generation strategy used
+    do_sample: bool = True
+    use_split_past_cache: bool = False
 
-        # Parameters for manipulation of the model output logits
-        self.temperature = temperature
-        self.top_k = top_k
-        self.top_p = top_p
+    # Parameters for manipulation of the model output logits
+    temperature: float = 1.0
+    top_k: int = 50
+    top_p: float = 0.9
 
-        if self.use_split_past_cache:
-            raise NotImplementedError
-
-    def from_generation_config(
-        self,
-        config: GenerationConfig
-    ) -> None:
-        # Parameters that control the length of the output
-        self.max_new_tokens = config.max_new_tokens
-
-        # Parameters that control the generation strategy used
-        self.do_sample = config.do_sample
-        self.num_beams = config.num_beams
-        self.use_cache = config.use_cache
-
-        # Parameters for manipulation of the model output logits
-        self.temperature = config.temperature
-        self.top_k = config.top_k
-        self.top_p = config.top_p
-
-        assert self.num_beams == 1
-
+    def __post_init__(self):
         if self.use_split_past_cache:
             raise NotImplementedError
 
@@ -151,7 +100,6 @@ class Prompter(object):
 
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
-    
 
 
 # テンソルのシリアル化サイズ(bit)を測定する関数
@@ -177,10 +125,41 @@ def measure_tensor_size(
     return bit_size
 
 
-def export_torchinfo_summary(edge, cloud, input_ids):
-    with open(f'torchinfo_summary_log/first_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt', 'w') as f:
-        f.write(repr(torchinfo.summary(edge.first_model, input_data=input_ids, depth=10, col_width=50)))
-    with open(f'torchinfo_summary_log/second_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt', 'w') as f:
-        f.write(repr(torchinfo.summary(cloud.second_model, input_data=first_feature_vector, depth=10, col_width=50)))
-    with open(f'torchinfo_summary_log/third_{first_split_layer_indices}_{second_split_layer_indices}.txt', 'w') as f:
-        f.write(repr(torchinfo.summary(edge.third_model, input_data=second_feature_vector, depth=10, col_width=50)))
+def export_split_model_torchinfo_summary(edge, cloud, export_dir: str = 'torchinfo_summary_log') -> None:
+    dummy_sequence_length = 50
+    dummy_input_ids = torch.randint(0, 1000, (1, dummy_sequence_length))
+    dummy_inputs_embeds = torch.rand((1, dummy_sequence_length, edge.num_embed_dims))
+
+    with open(os.path.join(export_dir, f'first_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt'), 'w') as f:
+        f.write(repr(edge.first_model))
+        f.write('\n\n')
+        f.write(repr(torchinfo.summary(
+            edge.first_model, 
+            input_data=dummy_input_ids.long().to(edge.device),
+            depth=10, 
+            col_width=50, 
+            first_split_layer_index=edge.max_first_split_layer_index
+        )))
+
+    with open(os.path.join(export_dir, f'second_{cloud.first_split_layer_indices}_{cloud.second_split_layer_indices}.txt'), 'w') as f:
+        f.write(repr(cloud.second_model))
+        f.write('\n\n')
+        f.write(repr(torchinfo.summary(
+            cloud.second_model, 
+            input_data=dummy_inputs_embeds.half().to(cloud.device) if cloud.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(cloud.device),
+            depth=10, 
+            col_width=50,
+            first_split_layer_index=cloud.min_first_split_layer_index,
+            second_split_layer_index=cloud.max_second_split_layer_index
+        )))
+
+    with open(os.path.join(export_dir, f'third_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt'), 'w') as f:
+        f.write(repr(edge.third_model))
+        f.write('\n\n')
+        f.write(repr(torchinfo.summary(
+            edge.third_model, 
+            input_data=dummy_inputs_embeds.half().to(edge.device) if edge.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(edge.device),
+            depth=10, 
+            col_width=50,
+            second_split_layer_index=edge.min_second_split_layer_index
+        )))

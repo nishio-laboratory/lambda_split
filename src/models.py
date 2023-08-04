@@ -15,10 +15,10 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import LlamaModel, LlamaForCausalLM
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
-from transformers.models.llama.modeling_llama import logger
+from transformers.models.llama.modeling_llama import LlamaConfig, logger
 
 
-class FirstLlamaModel(LlamaModel):
+class FirstLlamaModel(LlamaModel):        
     def replace_unused_layers_with_identity(
             self,
             max_first_split_layer_index: int = None
@@ -28,10 +28,12 @@ class FirstLlamaModel(LlamaModel):
         for i in range(max_first_split_layer_index, self.num_decoder_layers):
             self.layers[i] = ExtendedIdentity()
 
+        self.norm = ExtendedIdentity()
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
-        split_first_layer_index: int = None,
+        first_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
@@ -101,9 +103,9 @@ class FirstLlamaModel(LlamaModel):
         next_decoder_cache = () if use_cache else None
 
         self.num_decoder_layers = len(self.layers)
-        print('First  :', list(range(0, split_first_layer_index)))
+        print('First  :', list(range(0, first_split_layer_index)))
 
-        for idx in range(0, split_first_layer_index):
+        for idx in range(0, first_split_layer_index):
             decoder_layer = self.layers[idx]
 
             if output_hidden_states:
@@ -177,10 +179,13 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def replace_unused_layers_with_identity(self):
+        self.lm_head = ExtendedIdentity()
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
-        split_first_layer_index: int = None,
+        first_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
@@ -200,7 +205,7 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
-            split_first_layer_index=split_first_layer_index,
+            first_split_layer_index=first_split_layer_index,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -259,21 +264,25 @@ class SecondLlamaModel(LlamaModel):
     ) -> None:
         self.num_decoder_layers = len(self.layers)
 
+        self.embed_tokens = ExtendedIdentity()
+
         for i in range(0, min_first_split_layer_index):
             self.layers[i] = ExtendedIdentity()
 
         for i in range(max_second_split_layer_index, self.num_decoder_layers):
             self.layers[i] = ExtendedIdentity()
+
+        self.norm = ExtendedIdentity()
         
     def forward(
         self,
-        input_ids: torch.Tensor = None,
-        split_first_layer_index: int = None,
-        split_second_layer_index: int = None,
+        inputs_embeds: torch.FloatTensor,
+        first_split_layer_index: int = None,
+        second_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -339,9 +348,9 @@ class SecondLlamaModel(LlamaModel):
         next_decoder_cache = () if use_cache else None
 
         self.num_decoder_layers = len(self.layers)
-        print('Second :', list(range(split_first_layer_index, split_second_layer_index)))
+        print('Second :', list(range(first_split_layer_index, second_split_layer_index)))
 
-        for idx in range(split_first_layer_index, split_second_layer_index):
+        for idx in range(first_split_layer_index, second_split_layer_index):
             decoder_layer = self.layers[idx]
 
             if output_hidden_states:
@@ -415,15 +424,18 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def replace_unused_layers_with_identity(self):
+        self.lm_head = ExtendedIdentity()
+
     def forward(
         self,
-        input_ids: torch.Tensor = None,
-        split_first_layer_index: int = None,
-        split_second_layer_index: int = None,
+        inputs_embeds: torch.FloatTensor = None,
+        first_split_layer_index: int = None,
+        second_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -439,8 +451,8 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
-            split_first_layer_index=split_first_layer_index,
-            split_second_layer_index=split_second_layer_index,
+            first_split_layer_index=first_split_layer_index,
+            second_split_layer_index=second_split_layer_index,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -498,17 +510,19 @@ class ThirdLlamaModel(LlamaModel):
     ) -> None:
         self.num_decoder_layers = len(self.layers)
 
+        self.embed_tokens = ExtendedIdentity()
+
         for i in range(0, min_second_split_layer_index):
             self.layers[i] = ExtendedIdentity()
 
     def forward(
         self,
-        input_ids: torch.Tensor = None,
-        split_second_layer_index: int = None,
+        inputs_embeds: torch.FloatTensor,
+        second_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -574,9 +588,9 @@ class ThirdLlamaModel(LlamaModel):
         next_decoder_cache = () if use_cache else None
 
         self.num_decoder_layers = len(self.layers)
-        print('Third  :', list(range(split_second_layer_index, self.num_decoder_layers)))
+        print('Third  :', list(range(second_split_layer_index, self.num_decoder_layers)))
 
-        for idx in range(split_second_layer_index, self.num_decoder_layers):
+        for idx in range(second_split_layer_index, self.num_decoder_layers):
             decoder_layer = self.layers[idx]
 
             if output_hidden_states:
@@ -646,14 +660,17 @@ class ThirdLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def replace_unused_layers_with_identity(self):
+        pass
+
     def forward(
         self,
-        input_ids: torch.Tensor = None,
-        split_second_layer_index: int = None,
+        inputs_embeds: torch.FloatTensor = None,
+        second_split_layer_index: int = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -669,7 +686,7 @@ class ThirdLlamaForCausalLM(LlamaForCausalLM):
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
-            split_second_layer_index=split_second_layer_index,
+            second_split_layer_index=second_split_layer_index,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,

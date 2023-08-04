@@ -1,19 +1,19 @@
 import copy
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import torch
 from peft import PeftModel
 
 from src.models import FirstLlamaForCausalLM, SecondLlamaForCausalLM, ThirdLlamaForCausalLM
-from src.util import SplitComputingConfig, LLMConfig
+from src.util import SplitComputingConfig
 
 
 class Base:
     def __init__(
             self,
             split_computing_config: SplitComputingConfig,
-            llm_config: LLMConfig
+            base_model: str
     ) -> None:
         self.first_split_layer_indices = sorted(list(set(split_computing_config.first_split_layer_indices)))
         self.second_split_layer_indices = sorted(list(set(split_computing_config.second_split_layer_indices)))
@@ -27,18 +27,17 @@ class Base:
         self.num_first_split_layer_indices = len(self.first_split_layer_indices)
         self.num_second_split_layer_indices = len(self.second_split_layer_indices)
 
-        self.base_model = llm_config.base_model
-        self.lora_weights = llm_config.lora_weights
+        self.base_model = base_model
 
-        if self.base_model == 'huggyllama/llama-7b':
+        if '7b' in self.base_model:
             self.num_decoder_layers = 32
             self.num_embed_dims = 4096
 
-        elif self.base_model == 'huggyllama/llama-13b':
+        elif '13b' in self.base_model:
             self.num_decoder_layers = 40
             self.num_embed_dims = 5120
 
-        elif self.base_model == 'huggyllama/llama-30b':
+        elif '30b' in self.base_model:
             self.num_decoder_layers = 60
             self.num_embed_dims = 6556
 
@@ -65,7 +64,7 @@ class Base:
     def load_model(
             self, 
             position: str
-        ) -> PeftModel:
+        ) -> Union[FirstLlamaForCausalLM, SecondLlamaForCausalLM, ThirdLlamaForCausalLM, PeftModel]:
         assert position in ['first', 'second', 'third']
 
         if position == 'first':
@@ -75,41 +74,12 @@ class Base:
         elif position == 'third':
             position_model = ThirdLlamaForCausalLM
 
-        if self.device == "cuda":
-            model = position_model.from_pretrained(
-                self.base_model,
-                device_map={"": self.device},
-                torch_dtype=torch.float16
-            )
-            model = PeftModel.from_pretrained(
-                model,
-                self.lora_weights,
-                device_map={"": self.device},
-                torch_dtype=torch.float16
-            )
-        elif self.device == "mps":
-            model = position_model.from_pretrained(
-                self.base_model,
-                device_map={"": self.device},
-                torch_dtype=torch.float16
-            )
-            model = PeftModel.from_pretrained(
-                model,
-                self.lora_weights,
-                device_map={"": self.device},
-                torch_dtype=torch.float16
-            )
-        else:
-            model = position_model.from_pretrained(
-                self.base_model, 
-                device_map={"": self.device}, 
-                low_cpu_mem_usage=True
-            )
-            model = PeftModel.from_pretrained(
-                model,
-                self.lora_weights,
-                device_map={"": self.device}
-            )
+        model = position_model.from_pretrained(
+            self.base_model,
+            device_map={"": self.device},
+            torch_dtype=torch.float16 if self.device == 'cuda' or 'mps' else torch.float32,
+            low_cpu_mem_usage=True if self.device == 'cpu' else None
+        )
 
         model.tie_weights()
 
