@@ -9,20 +9,20 @@ from transformers import LlamaTokenizer, LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
-from src.util import SplitComputingConfig, LLMConfig, SimplifiedGenerationConfig, measure_tensor_size
+from src.util import SplitComputingConfig, SimplifiedGenerationConfig, measure_tensor_size
 
 
 class Edge(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            llm_config: LLMConfig
+            base_model: str
         ) -> None:
         
-        super().__init__(split_computing_config, llm_config)
+        super().__init__(split_computing_config, base_model)
 
         self.split_computing_config = split_computing_config
-        self.tokenizer = LlamaTokenizer.from_pretrained(llm_config.base_model)
+        self.tokenizer = LlamaTokenizer.from_pretrained(base_model)
         self.tokenizer.pad_token_id = 0 # unk
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
@@ -53,7 +53,8 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [0, max_first_split_layer_index) 以外を ExtendedIdentity で置き換える
-            first_model.base_model.model.model.replace_unused_layers_with_identity(
+            first_model.replace_unused_layers_with_identity()
+            first_model.model.replace_unused_layers_with_identity(
                 max_first_split_layer_index=self.max_first_split_layer_index
             )
 
@@ -64,7 +65,8 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_second_split_layer_index, self.num_decoder_layers) 以外を ExtendedIdentity で置き換える
-            third_model.base_model.model.model.replace_unused_layers_with_identity(
+            third_model.replace_unused_layers_with_identity()
+            third_model.model.replace_unused_layers_with_identity(
                 min_second_split_layer_index=self.min_second_split_layer_index
             )
         
@@ -73,7 +75,7 @@ class Edge(Base):
     def infer_first_model(
             self, 
             input_ids: torch.LongTensor,
-            split_first_layer_index: int
+            first_split_layer_index: int
     ) -> torch.Tensor:
         input_ids = input_ids.to(self.device) #.long()
 
@@ -81,14 +83,14 @@ class Edge(Base):
         with torch.no_grad():
             first_feature_vector = self.first_model(
                 input_ids=input_ids,
-                split_first_layer_index=split_first_layer_index
+                first_split_layer_index=first_split_layer_index
             )
 
         if self.split_computing_config.use_split_sent_cache:
             # すでに送信した past_index を削除する
             first_feature_vector_for_send = self._delete_already_sent_first_feature_vector_indices(
                 first_feature_vector=first_feature_vector,
-                split_first_layer_index=split_first_layer_index
+                first_split_layer_index=first_split_layer_index
             )
         else:
             first_feature_vector_for_send = first_feature_vector
@@ -125,21 +127,21 @@ class Edge(Base):
     def _delete_already_sent_first_feature_vector_indices(
             self,
             first_feature_vector: torch.Tensor,
-            split_first_layer_index: int
+            first_split_layer_index: int
     ) -> torch.Tensor:
         # まだ送信していない past_index のみを取り出す
-        sent_latest_past_index_of_first_feature_vector_with_past = self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index]
+        sent_latest_past_index_of_first_feature_vector_with_past = self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index]
         first_feature_vector_for_send = first_feature_vector[:, sent_latest_past_index_of_first_feature_vector_with_past:, :]
 
         # latest_past_index の更新
-        self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index] = first_feature_vector.shape[1]
+        self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index] = first_feature_vector.shape[1]
         
         return first_feature_vector_for_send
 
     def infer_third_model(
             self, 
             second_feature_vector_for_send: torch.Tensor,
-            split_second_layer_index: int
+            second_split_layer_index: int
     ) -> CausalLMOutputWithPast:
         second_feature_vector_for_send = second_feature_vector_for_send.to(self.device) #.float()
 
@@ -157,19 +159,19 @@ class Edge(Base):
             time.sleep(wait_time)
 
         if self.split_computing_config.use_split_sent_cache:
-            self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index] = torch.cat((
-                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index], 
+            self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index] = torch.cat((
+                self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index], 
                 second_feature_vector_for_send), 
                 dim=1
             )
-            second_feature_vector = self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index]
+            second_feature_vector = self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index]
         else:
             second_feature_vector = second_feature_vector_for_send
 
         with torch.no_grad():
             output = self.third_model(
                 inputs_embeds=second_feature_vector, 
-                split_second_layer_index=split_second_layer_index
+                second_split_layer_index=second_split_layer_index
             )
 
         return output

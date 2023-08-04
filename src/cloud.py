@@ -5,17 +5,17 @@ import numpy as np
 import torch
 
 from src.base import Base
-from src.util import SplitComputingConfig, LLMConfig
+from src.util import SplitComputingConfig
 
 
 class Cloud(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            llm_config: LLMConfig
+            base_model: str
         ) -> None:
         
-        super().__init__(split_computing_config, llm_config)
+        super().__init__(split_computing_config, base_model)
 
         self.split_computing_config = split_computing_config
 
@@ -41,7 +41,8 @@ class Cloud(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_first_split_layer_index, max_second_split_layer_index) 以外を ExtendedIdentity で置き換える
-            second_model.base_model.model.model.replace_unused_layers_with_identity(
+            second_model.replace_unused_layers_with_identity()
+            second_model.model.replace_unused_layers_with_identity(
                 min_first_split_layer_index=self.min_first_split_layer_index,
                 max_second_split_layer_index=self.max_second_split_layer_index
             )
@@ -51,32 +52,32 @@ class Cloud(Base):
     def infer_second_model(
         self, 
         first_feature_vector_for_send: torch.Tensor,
-        split_first_layer_index: int,
-        split_second_layer_index: int
+        first_split_layer_index: int,
+        second_split_layer_index: int
     ) -> torch.Tensor:
         first_feature_vector_for_send = first_feature_vector_for_send.to(self.device).half()
 
         if self.split_computing_config.use_split_sent_cache:
-            self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index] = torch.cat((
-                self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index], 
+            self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index] = torch.cat((
+                self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index], 
                 first_feature_vector_for_send), 
                 dim=1
             )
-            first_feature_vector = self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_first_layer_index]
+            first_feature_vector = self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index]
         else:
             first_feature_vector = first_feature_vector_for_send
 
         with torch.no_grad():
             second_feature_vector = self.second_model(
                 inputs_embeds=first_feature_vector, 
-                split_first_layer_index=split_first_layer_index, 
-                split_second_layer_index=split_second_layer_index
+                first_split_layer_index=first_split_layer_index, 
+                second_split_layer_index=second_split_layer_index
             )
 
         if self.split_computing_config.use_split_sent_cache:
             second_feature_vector_for_send = self._delete_already_sent_second_feature_vector_indices(
                 second_feature_vector=second_feature_vector,
-                split_second_layer_index=split_second_layer_index
+                second_split_layer_index=second_split_layer_index
             )
         else:
             second_feature_vector_for_send = second_feature_vector
@@ -96,13 +97,13 @@ class Cloud(Base):
     def _delete_already_sent_second_feature_vector_indices(
             self,
             second_feature_vector: torch.Tensor,
-            split_second_layer_index: int
+            second_split_layer_index: int
     ) -> torch.Tensor:
         # まだ送信していない past_index のみを取り出す
-        sent_latest_past_index_of_second_feature_vector_with_past = self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index]
+        sent_latest_past_index_of_second_feature_vector_with_past = self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index]
         second_feature_vector_for_send = second_feature_vector[:, sent_latest_past_index_of_second_feature_vector_with_past:, :]
 
         # latest_past_index の更新
-        self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_second_layer_index] = second_feature_vector.shape[1]
+        self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index] = second_feature_vector.shape[1]
         
         return second_feature_vector_for_send
