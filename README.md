@@ -5,15 +5,13 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 
 ## 技術的要点
 
-- LLM実装は、MetaのOpen Source LLMであるLLaMaを、Stanford Alpacaのデータセットを用いてLow-rank adaptation（LoRA）でファインチューニングした Alpaca-lora [1] を使用
 - Triadic にすることで、通信はすべて中間層出力の特徴ベクトルで行われるため、安全性が高い
 - Transformerベースの言語モデルがDecoderを複数重ねていることを利用し、分割するレイヤを毎回変えることで、特徴ベクトル形状は同じものの、異なるレイヤの中間層出力を送っているため、復元が難しい
 - LLMはサイズが大きいので、Splitしてサイズを小さくして多くのデバイスでロード可能にする
 - (特徴ベクトルはサイズが大きいため、Int8量子化 [2] をして送信する or Dropoutする)
+- LLM実装は、MetaのOpen Source LLMであるLLaMa-2 または LLaMa を使用
 
-[1] https://github.com/tloen/alpaca-lora
-
-[2] https://speakerdeck.com/joisino/shen-ceng-moderunogao-su-hua?slide=7
+[1] https://speakerdeck.com/joisino/shen-ceng-moderunogao-su-hua?slide=7
 
 
 
@@ -25,15 +23,12 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 ## ファイルの説明
 
 - `main.py` : メインプログラム
-- `main_with_latency.py` : 中間層特徴ベクトルを送信するときにかかるレイテンシを考慮したメインプログラム
-- `main_dropout.py` : Dropoutを試すためのメインプログラム
-- `main_quantization.py` : 量子化を試すためのメインプログラム
 - `src/cloud.py` : クラウドクラス（first modelとthird modelを推論）
 - `src/edge.py` : エッジクラス（second modelを推論）
 - `src/base.py` : クラウドサーバ・エッジサーバの継承元クラス
 - `src/models.py` : 分割用のLLMクラスである`FirstLlamaModel`・`FirstLlamaForCausalLM`・`SecondLlamaModel`・`SecondLlamaForCausalLM`・`ThirdLlamaModel`・`ThirdLlamaForCausalLM`が定義されている
 - `src/utils.py` : LLaMa推論のためのutilを公式から持ってきている
-- `torchinfo_summary_log/?_1_31` : `main.py` で `first_split_layer_indices = {1}` と `second_split_layer_indices = {31}` を指定した場合の `torchinfo.summary` の結果
+- `torchinfo_summary_log/` : 分割したLLMの `torchinfo.summary` の結果
 
 
 ## 実行方法
@@ -45,4 +40,4 @@ python3 main.py
 ```
 
 初回時はPre-trainedモデルのダウンロードが必要。
-開始時に毎回Pre-trainedモデルのローディングで1分くらいかかる。
+LLaMa-2 では、https://note.com/npaka/n/n79eebc29366d の3.1の利用申請と3.2の `huggingface-cli login` をする必要がある。
