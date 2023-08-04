@@ -125,12 +125,12 @@ def measure_tensor_size(
     return bit_size
 
 
-def export_split_model_torchinfo_summary(edge, cloud, export_dir: str = 'torchinfo_summary_log') -> None:
+def export_split_model_torchinfo_summary(base_model, edge, cloud, export_dir: str = 'torchinfo_summary_log') -> None:
     dummy_sequence_length = 50
     dummy_input_ids = torch.randint(0, 1000, (1, dummy_sequence_length))
     dummy_inputs_embeds = torch.rand((1, dummy_sequence_length, edge.num_embed_dims))
 
-    export_dir = os.path.join(export_dir, f'{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
+    export_dir = os.path.join(export_dir, f'{base_model}_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
     os.makedirs(export_dir, exist_ok=True)
 
     with open(os.path.join(export_dir, f'first.txt'), 'w') as f:

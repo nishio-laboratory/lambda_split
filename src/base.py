@@ -1,5 +1,6 @@
 import copy
 from typing import List, Union
+import gc
 
 import numpy as np
 import torch
@@ -95,3 +96,6 @@ class Base:
 
         return model
     
+    def free_memory(self):
+        torch.cuda.empty_cache()
+        gc.collect()

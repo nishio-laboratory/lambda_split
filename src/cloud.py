@@ -46,7 +46,8 @@ class Cloud(Base):
                 min_first_split_layer_index=self.min_first_split_layer_index,
                 max_second_split_layer_index=self.max_second_split_layer_index
             )
-            torch.cuda.empty_cache()
+        
+        self.free_memory()
 
         return second_model
     

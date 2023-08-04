@@ -49,14 +49,14 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         'decapoda-research/llama-30b-hf-int4',
         'decapoda-research/llama-65b-hf-int4',
     ]
-    base_model = base_model_list_llama2[0]
+    base_model = base_model_list_llama2[1]
 
     # Edge と Cloud のインスタンス
     edge = Edge(edge_split_computing_config, base_model)
     cloud = Cloud(cloud_split_computing_config, base_model)
 
     # Export torchinfo summary
-    export_split_model_torchinfo_summary(edge, cloud, export_dir='torchinfo_summary_log')
+    export_split_model_torchinfo_summary(base_model, edge, cloud, export_dir='torchinfo_summary_log')
 
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
@@ -114,7 +114,8 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             input_ids = torch.cat([input_ids, next_tokens], dim=-1)
 
             # デトークナイズされたテキストを出力
-            yield prompter.get_response(edge.tokenizer.decode(input_ids[0]))
+            cur = time.time()
+            yield prompter.get_response(edge.tokenizer.decode(input_ids[0])) + f'\n\n({idx + 1} tokens, {cur - start:.2f} seconds, {idx / (cur - start):.2f} tps)'
 
 
         print(edge.tokenizer.decode(input_ids[0]))
@@ -137,7 +138,8 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         edge.reset_split_sent_cache()
         cloud.reset_split_sent_cache()
 
-        yield prompter.get_response(edge.tokenizer.decode(input_ids[0])) + f'\n({idx + 1} tokens / {end - start:.2f} seconds)'
+        edge.free_memory()
+        cloud.free_memory()
 
 
     if show_ui:
@@ -177,7 +179,7 @@ if __name__ == '__main__':
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    first_split_layer_indices = [1, 2, 3, 4, 5]
-    second_split_layer_indices = [27, 28, 29, 30, 31]
+    first_split_layer_indices = np.array([5, 6, 7, 8, 9])
+    second_split_layer_indices = np.array([-9, -8, -7, -6, -5]) + 40
 
     main(first_split_layer_indices, second_split_layer_indices, 42, True)
