@@ -57,6 +57,7 @@ class Edge(Base):
             first_model.model.replace_unused_layers_with_identity(
                 max_first_split_layer_index=self.max_first_split_layer_index
             )
+            torch.cuda.empty_cache()
 
         return first_model
 
@@ -69,6 +70,7 @@ class Edge(Base):
             third_model.model.replace_unused_layers_with_identity(
                 min_second_split_layer_index=self.min_second_split_layer_index
             )
+            torch.cuda.empty_cache()
         
         return third_model
 
