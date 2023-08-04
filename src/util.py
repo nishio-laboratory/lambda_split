@@ -130,7 +130,12 @@ def export_split_model_torchinfo_summary(edge, cloud, export_dir: str = 'torchin
     dummy_input_ids = torch.randint(0, 1000, (1, dummy_sequence_length))
     dummy_inputs_embeds = torch.rand((1, dummy_sequence_length, edge.num_embed_dims))
 
-    with open(os.path.join(export_dir, f'first_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt'), 'w') as f:
+    export_dir = os.path.join(export_dir, f'{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
+    os.makedirs(export_dir, exist_ok=True)
+
+    with open(os.path.join(export_dir, f'first.txt'), 'w') as f:
+        f.write(f'First  : {list(range(0, edge.max_first_split_layer_index))}')
+        f.write('\n\n')
         f.write(repr(edge.first_model))
         f.write('\n\n')
         f.write(repr(torchinfo.summary(
@@ -141,7 +146,9 @@ def export_split_model_torchinfo_summary(edge, cloud, export_dir: str = 'torchin
             first_split_layer_index=edge.max_first_split_layer_index
         )))
 
-    with open(os.path.join(export_dir, f'second_{cloud.first_split_layer_indices}_{cloud.second_split_layer_indices}.txt'), 'w') as f:
+    with open(os.path.join(export_dir, f'second.txt'), 'w') as f:
+        f.write(f'Second : {list(range(cloud.min_first_split_layer_index, cloud.max_second_split_layer_index))}')
+        f.write('\n\n')
         f.write(repr(cloud.second_model))
         f.write('\n\n')
         f.write(repr(torchinfo.summary(
@@ -153,7 +160,9 @@ def export_split_model_torchinfo_summary(edge, cloud, export_dir: str = 'torchin
             second_split_layer_index=cloud.max_second_split_layer_index
         )))
 
-    with open(os.path.join(export_dir, f'third_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}.txt'), 'w') as f:
+    with open(os.path.join(export_dir, f'third.txt'), 'w') as f:
+        f.write(f'Third  : {list(range(edge.min_second_split_layer_index, edge.num_decoder_layers))}')
+        f.write('\n\n')
         f.write(repr(edge.third_model))
         f.write('\n\n')
         f.write(repr(torchinfo.summary(

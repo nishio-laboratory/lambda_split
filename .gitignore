@@ -162,4 +162,3 @@ cython_debug/
 nohup.out
 *.pth
 test*.py
-torchinfo_summary_log/
