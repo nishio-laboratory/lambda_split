@@ -133,42 +133,46 @@ def export_split_model_torchinfo_summary(base_model, edge, cloud, export_dir: st
     export_dir = os.path.join(export_dir, f'{base_model}_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
     os.makedirs(export_dir, exist_ok=True)
 
-    with open(os.path.join(export_dir, f'first.txt'), 'w') as f:
-        f.write(f'First  : {list(range(0, edge.max_first_split_layer_index))}')
-        f.write('\n\n')
-        f.write(repr(edge.first_model))
-        f.write('\n\n')
-        f.write(repr(torchinfo.summary(
-            edge.first_model, 
-            input_data=dummy_input_ids.long().to(edge.device),
-            depth=10, 
-            col_width=50, 
-            first_split_layer_index=edge.max_first_split_layer_index
-        )))
+    try:
+        with open(os.path.join(export_dir, f'first.txt'), 'w') as f:
+            f.write(f'First  : {list(range(0, edge.max_first_split_layer_index))}')
+            f.write('\n\n')
+            f.write(repr(edge.first_model))
+            f.write('\n\n')
+            f.write(repr(torchinfo.summary(
+                edge.first_model, 
+                input_data=dummy_input_ids.long().to(edge.device),
+                depth=10, 
+                col_width=50, 
+                first_split_layer_index=edge.max_first_split_layer_index
+            )))
 
-    with open(os.path.join(export_dir, f'second.txt'), 'w') as f:
-        f.write(f'Second : {list(range(cloud.min_first_split_layer_index, cloud.max_second_split_layer_index))}')
-        f.write('\n\n')
-        f.write(repr(cloud.second_model))
-        f.write('\n\n')
-        f.write(repr(torchinfo.summary(
-            cloud.second_model, 
-            input_data=dummy_inputs_embeds.half().to(cloud.device) if cloud.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(cloud.device),
-            depth=10, 
-            col_width=50,
-            first_split_layer_index=cloud.min_first_split_layer_index,
-            second_split_layer_index=cloud.max_second_split_layer_index
-        )))
+        with open(os.path.join(export_dir, f'second.txt'), 'w') as f:
+            f.write(f'Second : {list(range(cloud.min_first_split_layer_index, cloud.max_second_split_layer_index))}')
+            f.write('\n\n')
+            f.write(repr(cloud.second_model))
+            f.write('\n\n')
+            f.write(repr(torchinfo.summary(
+                cloud.second_model, 
+                input_data=dummy_inputs_embeds.half().to(cloud.device) if cloud.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(cloud.device),
+                depth=10, 
+                col_width=50,
+                first_split_layer_index=cloud.min_first_split_layer_index,
+                second_split_layer_index=cloud.max_second_split_layer_index
+            )))
 
-    with open(os.path.join(export_dir, f'third.txt'), 'w') as f:
-        f.write(f'Third  : {list(range(edge.min_second_split_layer_index, edge.num_decoder_layers))}')
-        f.write('\n\n')
-        f.write(repr(edge.third_model))
-        f.write('\n\n')
-        f.write(repr(torchinfo.summary(
-            edge.third_model, 
-            input_data=dummy_inputs_embeds.half().to(edge.device) if edge.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(edge.device),
-            depth=10, 
-            col_width=50,
-            second_split_layer_index=edge.min_second_split_layer_index
-        )))
+        with open(os.path.join(export_dir, f'third.txt'), 'w') as f:
+            f.write(f'Third  : {list(range(edge.min_second_split_layer_index, edge.num_decoder_layers))}')
+            f.write('\n\n')
+            f.write(repr(edge.third_model))
+            f.write('\n\n')
+            f.write(repr(torchinfo.summary(
+                edge.third_model, 
+                input_data=dummy_inputs_embeds.half().to(edge.device) if edge.device == 'cuda' or 'mps' else dummy_inputs_embeds.float().to(edge.device),
+                depth=10, 
+                col_width=50,
+                second_split_layer_index=edge.min_second_split_layer_index
+            )))
+
+    except Exception as e:
+        print(e)

@@ -9,7 +9,7 @@ from transformers import LlamaTokenizer, LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
-from src.util import SplitComputingConfig, SimplifiedGenerationConfig, measure_tensor_size
+from src.utils import SplitComputingConfig, SimplifiedGenerationConfig, measure_tensor_size
 
 
 class Edge(Base):
@@ -53,8 +53,7 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [0, max_first_split_layer_index) 以外を ExtendedIdentity で置き換える
-            first_model.replace_unused_layers_with_identity()
-            first_model.model.replace_unused_layers_with_identity(
+            first_model.replace_unused_layers_with_identity(
                 max_first_split_layer_index=self.max_first_split_layer_index
             )
         
@@ -67,8 +66,7 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_second_split_layer_index, self.num_decoder_layers) 以外を ExtendedIdentity で置き換える
-            third_model.replace_unused_layers_with_identity()
-            third_model.model.replace_unused_layers_with_identity(
+            third_model.replace_unused_layers_with_identity(
                 min_second_split_layer_index=self.min_second_split_layer_index
             )
         

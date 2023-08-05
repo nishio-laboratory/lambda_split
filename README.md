@@ -27,7 +27,7 @@ Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
 - `src/edge.py` : エッジクラス（second modelを推論）
 - `src/base.py` : クラウドサーバ・エッジサーバの継承元クラス
 - `src/models.py` : 分割用のLLMクラスである`FirstLlamaModel`・`FirstLlamaForCausalLM`・`SecondLlamaModel`・`SecondLlamaForCausalLM`・`ThirdLlamaModel`・`ThirdLlamaForCausalLM`が定義されている
-- `src/utils.py` : LLaMa推論のためのutilを公式から持ってきている
+- `src/utils.py` : 推論のためのutils
 - `torchinfo_summary_log/` : 分割したLLMの `torchinfo.summary` の結果
 
 

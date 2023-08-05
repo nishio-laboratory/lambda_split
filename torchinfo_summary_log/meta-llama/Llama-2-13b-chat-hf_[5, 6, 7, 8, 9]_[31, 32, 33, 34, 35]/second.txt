@@ -2,7 +2,7 @@ Second : [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
 
 SecondLlamaForCausalLM(
   (model): SecondLlamaModel(
-    (embed_tokens): ExtendedIdentity()
+    (embed_tokens): Embedding(32000, 5120, padding_idx=0)
     (layers): ModuleList(
       (0-4): 5 x ExtendedIdentity()
       (5-34): 30 x LlamaDecoderLayer(
@@ -27,13 +27,14 @@ SecondLlamaForCausalLM(
     (norm): ExtendedIdentity()
   )
   (lm_head): ExtendedIdentity()
+  (embed_tokens): ExtendedIdentity()
 )
 
 ===========================================================================================================================================================
 Layer (type:depth-idx)                                  Output Shape                                       Param #
 ===========================================================================================================================================================
 SecondLlamaForCausalLM                                  [1, 50, 5120]                                      --
-├─SecondLlamaModel: 1-1                                 [1, 50, 5120]                                      --
+├─SecondLlamaModel: 1-1                                 [1, 50, 5120]                                      163,840,000
 │    └─ModuleList: 2-1                                  --                                                 --
 │    │    └─LlamaDecoderLayer: 3-1                      [1, 50, 5120]                                      --
 │    │    │    └─LlamaRMSNorm: 4-1                      [1, 50, 5120]                                      5,120
@@ -456,8 +457,8 @@ SecondLlamaForCausalLM                                  [1, 50, 5120]           
 │    │    │    │    └─Linear: 5-269                     [1, 50, 13824]                                     70,778,880
 │    │    │    │    └─Linear: 5-270                     [1, 50, 5120]                                      70,778,880
 ===========================================================================================================================================================
-Total params: 9,516,134,400
-Trainable params: 9,516,134,400
+Total params: 9,679,974,400
+Trainable params: 9,679,974,400
 Non-trainable params: 0
 Total mult-adds (G): 9.52
 ===========================================================================================================================================================

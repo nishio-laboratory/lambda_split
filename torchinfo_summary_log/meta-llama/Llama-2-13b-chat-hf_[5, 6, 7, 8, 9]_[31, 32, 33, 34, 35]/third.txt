@@ -2,7 +2,7 @@ Third  : [31, 32, 33, 34, 35, 36, 37, 38, 39]
 
 ThirdLlamaForCausalLM(
   (model): ThirdLlamaModel(
-    (embed_tokens): ExtendedIdentity()
+    (embed_tokens): Embedding(32000, 5120, padding_idx=0)
     (layers): ModuleList(
       (0-30): 31 x ExtendedIdentity()
       (31-39): 9 x LlamaDecoderLayer(
@@ -26,13 +26,14 @@ ThirdLlamaForCausalLM(
     (norm): LlamaRMSNorm()
   )
   (lm_head): Linear(in_features=5120, out_features=32000, bias=False)
+  (embed_tokens): ExtendedIdentity()
 )
 
 ===========================================================================================================================================================
 Layer (type:depth-idx)                                  Output Shape                                       Param #
 ===========================================================================================================================================================
 ThirdLlamaForCausalLM                                   [1, 40, 50, 128]                                   --
-├─ThirdLlamaModel: 1-1                                  [1, 40, 50, 128]                                   --
+├─ThirdLlamaModel: 1-1                                  [1, 40, 50, 128]                                   163,840,000
 │    └─ModuleList: 2-1                                  --                                                 --
 │    │    └─LlamaDecoderLayer: 3-1                      [1, 50, 5120]                                      --
 │    │    │    └─LlamaRMSNorm: 4-1                      [1, 50, 5120]                                      5,120
@@ -163,13 +164,13 @@ ThirdLlamaForCausalLM                                   [1, 40, 50, 128]        
 │    └─LlamaRMSNorm: 2-2                                [1, 50, 5120]                                      5,120
 ├─Linear: 1-2                                           [1, 50, 32000]                                     163,840,000
 ===========================================================================================================================================================
-Total params: 3,018,685,440
-Trainable params: 3,018,685,440
+Total params: 3,182,525,440
+Trainable params: 3,182,525,440
 Non-trainable params: 0
 Total mult-adds (G): 3.02
 ===========================================================================================================================================================
 Input size (MB): 0.51
-Forward/backward pass size (MB): 121.70
-Params size (MB): 6037.37
-Estimated Total Size (MB): 6159.59
+Forward/backward pass size (MB): 243.40
+Params size (MB): 12074.74
+Estimated Total Size (MB): 12318.66
 ===========================================================================================================================================================

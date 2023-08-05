@@ -15,21 +15,10 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import LlamaModel, LlamaForCausalLM
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
-from transformers.models.llama.modeling_llama import LlamaConfig, logger
+from transformers.models.llama.modeling_llama import logger
 
 
 class FirstLlamaModel(LlamaModel):        
-    def replace_unused_layers_with_identity(
-            self,
-            max_first_split_layer_index: int = None
-    ) -> None:
-        self.num_decoder_layers = len(self.layers)
-
-        for i in range(max_first_split_layer_index, self.num_decoder_layers):
-            self.layers[i] = ExtendedIdentity()
-
-        self.norm = ExtendedIdentity()
-
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -179,7 +168,17 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
-    def replace_unused_layers_with_identity(self):
+    def replace_unused_layers_with_identity(
+            self,
+            max_first_split_layer_index: int = None
+    ) -> None:
+        self.num_decoder_layers = len(self.model.layers)
+
+        for i in range(max_first_split_layer_index, self.num_decoder_layers):
+            self.model.layers[i] = ExtendedIdentity()
+
+        self.model.norm = ExtendedIdentity()
+
         self.lm_head = ExtendedIdentity()
 
     def forward(
@@ -257,23 +256,6 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
 
 
 class SecondLlamaModel(LlamaModel):
-    def replace_unused_layers_with_identity(
-            self,
-            min_first_split_layer_index: int = None,
-            max_second_split_layer_index: int = None
-    ) -> None:
-        self.num_decoder_layers = len(self.layers)
-
-        self.embed_tokens = ExtendedIdentity()
-
-        for i in range(0, min_first_split_layer_index):
-            self.layers[i] = ExtendedIdentity()
-
-        for i in range(max_second_split_layer_index, self.num_decoder_layers):
-            self.layers[i] = ExtendedIdentity()
-
-        self.norm = ExtendedIdentity()
-        
     def forward(
         self,
         inputs_embeds: torch.FloatTensor,
@@ -424,7 +406,23 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
-    def replace_unused_layers_with_identity(self):
+    def replace_unused_layers_with_identity(
+            self,
+            min_first_split_layer_index: int = None,
+            max_second_split_layer_index: int = None
+    ) -> None:
+        self.num_decoder_layers = len(self.model.layers)
+
+        self.embed_tokens = ExtendedIdentity()
+
+        for i in range(0, min_first_split_layer_index):
+            self.model.layers[i] = ExtendedIdentity()
+
+        for i in range(max_second_split_layer_index, self.num_decoder_layers):
+            self.model.layers[i] = ExtendedIdentity()
+
+        self.model.norm = ExtendedIdentity()
+
         self.lm_head = ExtendedIdentity()
 
     def forward(
@@ -504,17 +502,6 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
 
 
 class ThirdLlamaModel(LlamaModel):
-    def replace_unused_layers_with_identity(
-            self,
-            min_second_split_layer_index: int = None
-    ) -> None:
-        self.num_decoder_layers = len(self.layers)
-
-        self.embed_tokens = ExtendedIdentity()
-
-        for i in range(0, min_second_split_layer_index):
-            self.layers[i] = ExtendedIdentity()
-
     def forward(
         self,
         inputs_embeds: torch.FloatTensor,
@@ -660,8 +647,16 @@ class ThirdLlamaForCausalLM(LlamaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
-    def replace_unused_layers_with_identity(self):
-        pass
+    def replace_unused_layers_with_identity(
+            self,
+            min_second_split_layer_index: int = None
+    ) -> None:
+        self.num_decoder_layers = len(self.model.layers)
+
+        self.embed_tokens = ExtendedIdentity()
+
+        for i in range(0, min_second_split_layer_index):
+            self.model.layers[i] = ExtendedIdentity()
 
     def forward(
         self,

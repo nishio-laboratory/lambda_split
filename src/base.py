@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from peft import PeftModel
 
-from src.models import FirstLlamaForCausalLM, SecondLlamaForCausalLM, ThirdLlamaForCausalLM
-from src.util import SplitComputingConfig
+from src.split_models import FirstLlamaForCausalLM, SecondLlamaForCausalLM, ThirdLlamaForCausalLM
+from src.utils import SplitComputingConfig
 
 
 class Base:
@@ -75,12 +75,24 @@ class Base:
         elif position == 'third':
             position_model = ThirdLlamaForCausalLM
 
-        model = position_model.from_pretrained(
-            self.base_model,
-            device_map={"": self.device},
-            torch_dtype=torch.float16 if self.device == 'cuda' or 'mps' else torch.float32,
-            low_cpu_mem_usage=True if self.device == 'cpu' else None
-        )
+        if self.device == "cuda":
+            model = position_model.from_pretrained(
+                self.base_model,
+                torch_dtype=torch.float16,
+                device_map={"": self.device},
+            )
+        elif self.device == "mps":
+            model = position_model.from_pretrained(
+                self.base_model,
+                device_map={"": self.device},
+                torch_dtype=torch.float16,
+            )
+        else:
+            model = position_model.from_pretrained(
+                self.base_model, 
+                device_map={"": self.device}, 
+                low_cpu_mem_usage=True
+            )
 
         model.tie_weights()
 

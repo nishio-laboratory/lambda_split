@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from src.base import Base
-from src.util import SplitComputingConfig
+from src.utils import SplitComputingConfig
 
 
 class Cloud(Base):
@@ -41,8 +41,7 @@ class Cloud(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_first_split_layer_index, max_second_split_layer_index) 以外を ExtendedIdentity で置き換える
-            second_model.replace_unused_layers_with_identity()
-            second_model.model.replace_unused_layers_with_identity(
+            second_model.replace_unused_layers_with_identity(
                 min_first_split_layer_index=self.min_first_split_layer_index,
                 max_second_split_layer_index=self.max_second_split_layer_index
             )

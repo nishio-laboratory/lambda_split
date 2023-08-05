@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.util import SplitComputingConfig, SimplifiedGenerationConfig, Prompter, export_split_model_torchinfo_summary
+from src.utils import SplitComputingConfig, SimplifiedGenerationConfig, Prompter, export_split_model_torchinfo_summary
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
@@ -43,13 +43,9 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         'decapoda-research/llama-7b-hf',
         'decapoda-research/llama-13b-hf',
         'decapoda-research/llama-30b-hf',
-        'decapoda-research/llama-65b-hf',
-        'decapoda-research/llama-7b-hf-int4',
-        'decapoda-research/llama-13b-hf-int4',
-        'decapoda-research/llama-30b-hf-int4',
-        'decapoda-research/llama-65b-hf-int4',
+        'decapoda-research/llama-65b-hf'
     ]
-    base_model = base_model_list_llama2[1]
+    base_model = base_model_list_llama2[0]
 
     # Edge と Cloud のインスタンス
     edge = Edge(edge_split_computing_config, base_model)
@@ -185,7 +181,7 @@ if __name__ == '__main__':
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    first_split_layer_indices = np.array([5, 6, 7, 8, 9])
-    second_split_layer_indices = np.array([-9, -8, -7, -6, -5]) + 40
+    first_split_layer_indices = np.array([1, 2, 3, 4, 5])
+    second_split_layer_indices = np.array([-5, -4, -3, -2, -1]) + 32
 
     main(first_split_layer_indices, second_split_layer_indices, 42, True)
