@@ -184,6 +184,9 @@ class Edge(Base):
             logits: torch.Tensor,
             config: SimplifiedGenerationConfig
         ) -> torch.Tensor:
+        '''
+        Reference : https://github.com/huggingface/transformers/blob/main/src/transformers/generation/utils.py#L488
+        '''
         do_sample = config.do_sample
         temperature = config.temperature
         top_k = config.top_k

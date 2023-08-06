@@ -15,7 +15,7 @@ from src.utils import SplitComputingConfig, SimplifiedGenerationConfig, Prompter
 def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
     # Edge での SplitComputingConfig
     edge_split_computing_config = SplitComputingConfig(
-        device='cuda',
+        device='cpu',
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
@@ -111,7 +111,14 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
             # デトークナイズされたテキストを出力
             cur = time.time()
-            yield prompter.get_response(edge.tokenizer.decode(input_ids[0])) + f'\n\n({idx + 1} tokens, {cur - start:.2f} seconds, {idx / (cur - start):.2f} tps)'
+
+            yield_str = prompter.get_response(edge.tokenizer.decode(input_ids[0])) + '\n\n\n' + \
+                '(Split Computing Info)\n' + \
+                f'First model  : {list(range(0, first_split_layer_index))}\n' + \
+                f'Second model : {list(range(first_split_layer_index, second_split_layer_index))}\n' + \
+                f'Third model  : {list(range(second_split_layer_index, edge.num_decoder_layers))}\n' + \
+                f'({idx + 1} tokens, {cur - start:.2f} seconds, {idx / (cur - start):.2f} tps)'
+            yield yield_str
 
 
         print(edge.tokenizer.decode(input_ids[0]))

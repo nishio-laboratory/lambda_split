@@ -15,7 +15,8 @@ class SplitComputingConfig(object):
     second_split_layer_indices: list
     random_seed: int = 42
     use_split_sent_cache: bool = True
-    do_shuffle: bool = True
+    do_shuffle: bool = False
+    past_dropout_rate: float = 0.0
     measure_tensor_size_method: bool = 'numpy_save'
     is_max_first_less_than_min_second: bool = True
     do_replace_unused_layers_with_identity: bool = True
