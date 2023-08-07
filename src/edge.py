@@ -9,20 +9,20 @@ from transformers import LlamaTokenizer, LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
-from src.utils import SplitComputingConfig, SimplifiedGenerationConfig, measure_tensor_size
+from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, measure_tensor_size
 
 
 class Edge(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            base_model: str
+            llm_config: LlmConfig
         ) -> None:
         
-        super().__init__(split_computing_config, base_model)
+        super().__init__(split_computing_config, llm_config)
 
         self.split_computing_config = split_computing_config
-        self.tokenizer = LlamaTokenizer.from_pretrained(base_model)
+        self.tokenizer = LlamaTokenizer.from_pretrained(llm_config.base_model)
         self.tokenizer.pad_token_id = 0 # unk
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
@@ -53,9 +53,14 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [0, max_first_split_layer_index) 以外を ExtendedIdentity で置き換える
-            first_model.replace_unused_layers_with_identity(
-                max_first_split_layer_index=self.max_first_split_layer_index
-            )
+            if self.llm_config.lora_weights is None:
+                first_model.replace_unused_layers_with_identity(
+                    max_first_split_layer_index=self.max_first_split_layer_index
+                )
+            else:
+                first_model.base_model.model.replace_unused_layers_with_identity(
+                    max_first_split_layer_index=self.max_first_split_layer_index
+                )
         
         self.free_memory()
 
@@ -66,9 +71,14 @@ class Edge(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_second_split_layer_index, self.num_decoder_layers) 以外を ExtendedIdentity で置き換える
-            third_model.replace_unused_layers_with_identity(
-                min_second_split_layer_index=self.min_second_split_layer_index
-            )
+            if self.llm_config.lora_weights is None:
+                third_model.replace_unused_layers_with_identity(
+                    min_second_split_layer_index=self.min_second_split_layer_index
+                )
+            else:
+                third_model.base_model.model.replace_unused_layers_with_identity(
+                    min_second_split_layer_index=self.min_second_split_layer_index
+                )
         
         self.free_memory()
         

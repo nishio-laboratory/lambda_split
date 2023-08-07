@@ -7,14 +7,14 @@ import torch
 from peft import PeftModel
 
 from src.split_models import FirstLlamaForCausalLM, SecondLlamaForCausalLM, ThirdLlamaForCausalLM
-from src.utils import SplitComputingConfig
+from src.utils import SplitComputingConfig, LlmConfig
 
 
 class Base:
     def __init__(
             self,
             split_computing_config: SplitComputingConfig,
-            base_model: str
+            llm_config: LlmConfig
     ) -> None:
         self.first_split_layer_indices = sorted(list(set(split_computing_config.first_split_layer_indices)))
         self.second_split_layer_indices = sorted(list(set(split_computing_config.second_split_layer_indices)))
@@ -28,17 +28,17 @@ class Base:
         self.num_first_split_layer_indices = len(self.first_split_layer_indices)
         self.num_second_split_layer_indices = len(self.second_split_layer_indices)
 
-        self.base_model = base_model
+        self.llm_config = llm_config
 
-        if '7b' in self.base_model:
+        if '7b' in self.llm_config.base_model:
             self.num_decoder_layers = 32
             self.num_embed_dims = 4096
 
-        elif '13b' in self.base_model:
+        elif '13b' in self.llm_config.base_model:
             self.num_decoder_layers = 40
             self.num_embed_dims = 5120
 
-        elif '30b' in self.base_model:
+        elif '30b' in self.llm_config.base_model:
             self.num_decoder_layers = 60
             self.num_embed_dims = 6556
 
@@ -77,22 +77,42 @@ class Base:
 
         if self.device == "cuda":
             model = position_model.from_pretrained(
-                self.base_model,
+                self.llm_config.base_model,
                 torch_dtype=torch.float16,
                 device_map={"": self.device},
             )
+            if self.llm_config.lora_weights is not None:
+                model = PeftModel.from_pretrained(
+                    model,
+                    self.llm_config.lora_weights,
+                    torch_dtype=torch.float16,
+                    device_map={"": self.device}
+                )
         elif self.device == "mps":
             model = position_model.from_pretrained(
-                self.base_model,
+                self.llm_config.base_model,
                 device_map={"": self.device},
                 torch_dtype=torch.float16,
             )
+            if self.llm_config.lora_weights is not None:
+                model = PeftModel.from_pretrained(
+                    model,
+                    self.llm_config.lora_weights,
+                    device_map={"": self.device},
+                    torch_dtype=torch.float16,
+                )
         else:
             model = position_model.from_pretrained(
-                self.base_model, 
+                self.llm_config.base_model, 
                 device_map={"": self.device}, 
                 low_cpu_mem_usage=True
             )
+            if self.llm_config.lora_weights is not None:
+                model = PeftModel.from_pretrained(
+                    model,
+                    self.llm_config.lora_weights,
+                    device_map={"": self.device},
+                )
 
         model.tie_weights()
 

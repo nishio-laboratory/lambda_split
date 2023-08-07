@@ -1,0 +1,89 @@
+Second : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+
+PeftModelForCausalLM(
+  (base_model): LoraModel(
+    (model): SecondLlamaForCausalLM(
+      (model): SecondLlamaModel(
+        (embed_tokens): Embedding(32000, 4096, padding_idx=0)
+        (layers): ModuleList(
+          (0): ExtendedIdentity()
+          (1-30): 30 x LlamaDecoderLayer(
+            (self_attn): LlamaAttention(
+              (q_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (k_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (v_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (o_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (rotary_emb): LlamaRotaryEmbedding()
+            )
+            (mlp): LlamaMLP(
+              (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+              (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+              (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+              (act_fn): SiLUActivation()
+            )
+            (input_layernorm): LlamaRMSNorm()
+            (post_attention_layernorm): LlamaRMSNorm()
+          )
+          (31): ExtendedIdentity()
+        )
+        (norm): ExtendedIdentity()
+      )
+      (lm_head): ExtendedIdentity()
+      (embed_tokens): ExtendedIdentity()
+    )
+  )
+)
+
+RuntimeError('Failed to run torchinfo. See above stack traces for more details. Executed layers up to: []')

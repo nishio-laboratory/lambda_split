@@ -5,17 +5,17 @@ import numpy as np
 import torch
 
 from src.base import Base
-from src.utils import SplitComputingConfig
+from src.utils import SplitComputingConfig, LlmConfig
 
 
 class Cloud(Base):
     def __init__(
             self, 
             split_computing_config: SplitComputingConfig,
-            base_model: str
+            llm_config: LlmConfig
         ) -> None:
         
-        super().__init__(split_computing_config, base_model)
+        super().__init__(split_computing_config, llm_config)
 
         self.split_computing_config = split_computing_config
 
@@ -41,10 +41,16 @@ class Cloud(Base):
 
         if self.do_replace_unused_layers_with_identity:
             # [min_first_split_layer_index, max_second_split_layer_index) 以外を ExtendedIdentity で置き換える
-            second_model.replace_unused_layers_with_identity(
-                min_first_split_layer_index=self.min_first_split_layer_index,
-                max_second_split_layer_index=self.max_second_split_layer_index
-            )
+            if self.llm_config.lora_weights is None:
+                second_model.replace_unused_layers_with_identity(
+                    min_first_split_layer_index=self.min_first_split_layer_index,
+                    max_second_split_layer_index=self.max_second_split_layer_index
+                )
+            else:
+                second_model.base_model.model.replace_unused_layers_with_identity(
+                    min_first_split_layer_index=self.min_first_split_layer_index,
+                    max_second_split_layer_index=self.max_second_split_layer_index
+                )
         
         self.free_memory()
 

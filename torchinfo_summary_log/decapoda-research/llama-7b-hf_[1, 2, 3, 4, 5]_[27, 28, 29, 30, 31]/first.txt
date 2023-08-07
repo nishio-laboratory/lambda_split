@@ -1,0 +1,296 @@
+First  : [0, 1, 2, 3, 4]
+
+PeftModelForCausalLM(
+  (base_model): LoraModel(
+    (model): FirstLlamaForCausalLM(
+      (model): FirstLlamaModel(
+        (embed_tokens): Embedding(32000, 4096, padding_idx=31999)
+        (layers): ModuleList(
+          (0-4): 5 x LlamaDecoderLayer(
+            (self_attn): LlamaAttention(
+              (q_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (k_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (v_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (o_proj): Linear(
+                in_features=4096, out_features=4096, bias=False
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.05, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=4096, out_features=16, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=16, out_features=4096, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+              )
+              (rotary_emb): LlamaRotaryEmbedding()
+            )
+            (mlp): LlamaMLP(
+              (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+              (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+              (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+              (act_fn): SiLUActivation()
+            )
+            (input_layernorm): LlamaRMSNorm()
+            (post_attention_layernorm): LlamaRMSNorm()
+          )
+          (5-31): 27 x ExtendedIdentity()
+        )
+        (norm): ExtendedIdentity()
+      )
+      (lm_head): ExtendedIdentity()
+    )
+  )
+)
+
+=====================================================================================================================================================================
+Layer (type:depth-idx)                                            Output Shape                                       Param #
+=====================================================================================================================================================================
+PeftModelForCausalLM                                              [1, 50, 4096]                                      --
+├─LoraModel: 1-1                                                  [1, 50, 4096]                                      --
+│    └─FirstLlamaForCausalLM: 2-1                                 --                                                 --
+│    │    └─FirstLlamaModel: 3-1                                  [1, 50, 4096]                                      --
+│    │    │    └─Embedding: 4-1                                   [1, 50, 4096]                                      (131,072,000)
+│    │    │    └─ModuleList: 4-2                                  --                                                 --
+│    │    │    │    └─LlamaDecoderLayer: 5-1                      [1, 50, 4096]                                      --
+│    │    │    │    │    └─LlamaRMSNorm: 6-1                      [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaAttention: 6-2                    [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-1                       [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-1              --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-1            [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-2              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-2             [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-3              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-3             [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-2                       [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-4              --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-4            [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-5              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-5             [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-6              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-6             [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-3                       [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-7              --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-7            [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-8              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-8             [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-9              --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-9             [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─LlamaRotaryEmbedding: 7-4         [1, 1, 50, 128]                                    --
+│    │    │    │    │    │    └─Linear: 7-5                       [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-10             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-10           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-11             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-11            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-12             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-12            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    └─LlamaRMSNorm: 6-3                      [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaMLP: 6-4                          [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-6                       [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─SiLUActivation: 7-7               [1, 50, 11008]                                     --
+│    │    │    │    │    │    └─Linear: 7-8                       [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─Linear: 7-9                       [1, 50, 4096]                                      (45,088,768)
+│    │    │    │    └─LlamaDecoderLayer: 5-2                      [1, 50, 4096]                                      --
+│    │    │    │    │    └─LlamaRMSNorm: 6-5                      [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaAttention: 6-6                    [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-10                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-13             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-13           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-14             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-14            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-15             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-15            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-11                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-16             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-16           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-17             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-17            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-18             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-18            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-12                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-19             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-19           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-20             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-20            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-21             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-21            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─LlamaRotaryEmbedding: 7-13        [1, 1, 50, 128]                                    --
+│    │    │    │    │    │    └─Linear: 7-14                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-22             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-22           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-23             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-23            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-24             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-24            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    └─LlamaRMSNorm: 6-7                      [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaMLP: 6-8                          [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-15                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─SiLUActivation: 7-16              [1, 50, 11008]                                     --
+│    │    │    │    │    │    └─Linear: 7-17                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─Linear: 7-18                      [1, 50, 4096]                                      (45,088,768)
+│    │    │    │    └─LlamaDecoderLayer: 5-3                      [1, 50, 4096]                                      --
+│    │    │    │    │    └─LlamaRMSNorm: 6-9                      [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaAttention: 6-10                   [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-19                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-25             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-25           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-26             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-26            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-27             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-27            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-20                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-28             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-28           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-29             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-29            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-30             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-30            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-21                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-31             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-31           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-32             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-32            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-33             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-33            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─LlamaRotaryEmbedding: 7-22        [1, 1, 50, 128]                                    --
+│    │    │    │    │    │    └─Linear: 7-23                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-34             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-34           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-35             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-35            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-36             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-36            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    └─LlamaRMSNorm: 6-11                     [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaMLP: 6-12                         [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-24                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─SiLUActivation: 7-25              [1, 50, 11008]                                     --
+│    │    │    │    │    │    └─Linear: 7-26                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─Linear: 7-27                      [1, 50, 4096]                                      (45,088,768)
+│    │    │    │    └─LlamaDecoderLayer: 5-4                      [1, 50, 4096]                                      --
+│    │    │    │    │    └─LlamaRMSNorm: 6-13                     [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaAttention: 6-14                   [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-28                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-37             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-37           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-38             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-38            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-39             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-39            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-29                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-40             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-40           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-41             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-41            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-42             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-42            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-30                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-43             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-43           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-44             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-44            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-45             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-45            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─LlamaRotaryEmbedding: 7-31        [1, 1, 50, 128]                                    --
+│    │    │    │    │    │    └─Linear: 7-32                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-46             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-46           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-47             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-47            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-48             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-48            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    └─LlamaRMSNorm: 6-15                     [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaMLP: 6-16                         [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-33                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─SiLUActivation: 7-34              [1, 50, 11008]                                     --
+│    │    │    │    │    │    └─Linear: 7-35                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─Linear: 7-36                      [1, 50, 4096]                                      (45,088,768)
+│    │    │    │    └─LlamaDecoderLayer: 5-5                      [1, 50, 4096]                                      --
+│    │    │    │    │    └─LlamaRMSNorm: 6-17                     [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaAttention: 6-18                   [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-37                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-49             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-49           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-50             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-50            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-51             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-51            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-38                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-52             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-52           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-53             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-53            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-54             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-54            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─Linear: 7-39                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-55             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-55           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-56             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-56            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-57             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-57            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    │    └─LlamaRotaryEmbedding: 7-40        [1, 1, 50, 128]                                    --
+│    │    │    │    │    │    └─Linear: 7-41                      [1, 50, 4096]                                      16,777,216
+│    │    │    │    │    │    │    └─ModuleDict: 8-58             --                                                 --
+│    │    │    │    │    │    │    │    └─Dropout: 9-58           [1, 50, 4096]                                      --
+│    │    │    │    │    │    │    └─ModuleDict: 8-59             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-59            [1, 50, 16]                                        (65,536)
+│    │    │    │    │    │    │    └─ModuleDict: 8-60             --                                                 --
+│    │    │    │    │    │    │    │    └─Linear: 9-60            [1, 50, 4096]                                      (65,536)
+│    │    │    │    │    └─LlamaRMSNorm: 6-19                     [1, 50, 4096]                                      (4,096)
+│    │    │    │    │    └─LlamaMLP: 6-20                         [1, 50, 4096]                                      --
+│    │    │    │    │    │    └─Linear: 7-42                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─SiLUActivation: 7-43              [1, 50, 11008]                                     --
+│    │    │    │    │    │    └─Linear: 7-44                      [1, 50, 11008]                                     (45,088,768)
+│    │    │    │    │    │    └─Linear: 7-45                      [1, 50, 4096]                                      (45,088,768)
+=====================================================================================================================================================================
+Total params: 1,145,610,240
+Trainable params: 0
+Non-trainable params: 1,145,610,240
+Total mult-adds (M): 810.07
+=====================================================================================================================================================================
+Input size (MB): 0.00
+Forward/backward pass size (MB): 103.14
+Params size (MB): 3240.26
+Estimated Total Size (MB): 3343.41
+=====================================================================================================================================================================

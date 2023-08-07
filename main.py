@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.utils import SplitComputingConfig, SimplifiedGenerationConfig, Prompter, export_split_model_torchinfo_summary
+from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, Prompter, export_split_model_torchinfo_summary
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
@@ -40,19 +40,37 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
     ]
     ## LLaMa : https://huggingface.co/decapoda-research
     base_model_list_llama = [
-        'decapoda-research/llama-7b-hf',
-        'decapoda-research/llama-13b-hf',
-        'decapoda-research/llama-30b-hf',
-        'decapoda-research/llama-65b-hf'
+        'huggyllama/llama-7b',
+        'huggyllama/llama-13b',
+        'huggyllama/llama-30b',
+        'huggyllama/llama-65b',
+        # 'decapoda-research/llama-7b-hf',
+        # 'decapoda-research/llama-13b-hf',
+        # 'decapoda-research/llama-30b-hf',
+        # 'decapoda-research/llama-65b-hf'
     ]
-    base_model = base_model_list_llama2[0]
+    lora_weights_list_llama = [
+        'tloen/alpaca-lora-7b',
+        'Angainor/alpaca-lora-13b',
+        'baseten/alpaca-30b',
+        'chansung/alpaca-lora-65b'
+    ]
+
+    # llm_config = LlmConfig(
+    #     base_model=base_model_list_llama2[0],
+    #     lora_weights=None
+    # )
+    llm_config = LlmConfig(
+        base_model=base_model_list_llama[0],
+        lora_weights=lora_weights_list_llama[0]
+    )
 
     # Edge と Cloud のインスタンス
-    edge = Edge(edge_split_computing_config, base_model)
-    cloud = Cloud(cloud_split_computing_config, base_model)
+    edge = Edge(edge_split_computing_config, llm_config)
+    cloud = Cloud(cloud_split_computing_config, llm_config)
 
     # Export torchinfo summary
-    export_split_model_torchinfo_summary(base_model, edge, cloud, export_dir='torchinfo_summary_log')
+    export_split_model_torchinfo_summary(llm_config.base_model, edge, cloud, export_dir='torchinfo_summary_log')
 
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
@@ -147,7 +165,10 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
     if show_ui:
         with gr.Blocks() as demo:
-            gr.Markdown(f"<h1><center>Demo : Triadic Split Computing for {base_model}</center></h1>")
+            if llm_config.lora_weights is None:
+                gr.Markdown(f"<h1><center>Demo : Triadic Split Computing for {llm_config.base_model}</center></h1>")
+            else:
+                gr.Markdown(f"<h1><center>Demo : Triadic Split Computing for {llm_config.base_model} with {llm_config.lora_weights}</center></h1>")
 
             with gr.Row():
                 with gr.Column(scale=1):
