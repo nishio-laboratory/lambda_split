@@ -162,4 +162,4 @@ cython_debug/
 nohup.out
 *.pth
 test*.py
-hidden_state_files/
+log/

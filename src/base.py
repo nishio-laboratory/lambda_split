@@ -31,25 +31,12 @@ class Base:
         self.num_second_split_layer_indices = len(self.second_split_layer_indices)
 
         self.llm_config = llm_config
-
-        if '7b' in self.llm_config.base_model:
-            self.num_decoder_layers = 32
-            self.num_embed_dims = 4096
-
-        elif '13b' in self.llm_config.base_model:
-            self.num_decoder_layers = 40
-            self.num_embed_dims = 5120
-
-        elif '30b' in self.llm_config.base_model:
-            self.num_decoder_layers = 60
-            self.num_embed_dims = 6556
-
         
         assert 0 <= self.min_first_split_layer_index
-        assert self.max_first_split_layer_index <= self.num_decoder_layers
+        assert self.max_first_split_layer_index <= self.llm_config.num_decoder_layers
 
         assert 0 <= self.min_second_split_layer_index
-        assert self.max_second_split_layer_index <= self.num_decoder_layers
+        assert self.max_second_split_layer_index <= self.llm_config.num_decoder_layers
 
         if split_computing_config.is_max_first_less_than_min_second:
             assert self.max_first_split_layer_index <= self.min_second_split_layer_index

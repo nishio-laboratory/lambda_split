@@ -36,25 +36,14 @@ class Edge(Base):
     def init_inference(self):
         if self.split_computing_config.use_split_sent_cache:
         # すでに送信した first_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
-            self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.llm_config.num_decoder_layers + 1)]
             for split_layer_index in self.second_split_layer_indices:
                 self.sent_latest_past_index_of_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
 
             # 過去の second_feature_vector_with_past を split_layer_index ごとに保存しておく
-            self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.llm_config.num_decoder_layers + 1)]
             for split_layer_index in self.second_split_layer_indices:
-                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
-
-        # 送受信テンソルのサイズを保存しておく
-        if self.split_computing_config.measure_tensor_size_method is not None:
-            self.send_tensor_size_list = []
-            self.receive_tensor_size_list = []
-
-        # saveする際の設定を初期化
-        if self.split_computing_config.save_hidden_states_to_file:
-            self.save_datetime_str = time.strftime('%y%m%d_%H%M%S')
-            self.send_counter = 0
-            self.receive_counter = 0
+                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.llm_config.num_embed_dims), dtype=torch.half).to(self.device)
 
     def _get_largest_first_model(self) -> None:
         first_model = self.load_model(position='first')
@@ -78,7 +67,7 @@ class Edge(Base):
         third_model = self.load_model(position='third')
 
         if self.do_replace_unused_layers_with_identity:
-            # [min_second_split_layer_index, self.num_decoder_layers) 以外を ExtendedIdentity で置き換える
+            # [min_second_split_layer_index, self.llm_config.num_decoder_layers) 以外を ExtendedIdentity で置き換える
             if self.llm_config.lora_weights is None:
                 third_model.replace_unused_layers_with_identity(
                     min_second_split_layer_index=self.min_second_split_layer_index
@@ -127,20 +116,6 @@ class Edge(Base):
         if self.split_computing_config.quantize_method is not None:
             raise NotImplementedError
 
-        # テンソルサイズ (bit) を計測
-        if self.split_computing_config.measure_tensor_size_method is not None:
-            print(f"{first_feature_vector_for_send.shape}")
-            self.measure_tensor_size_and_save_to_file(
-                tensor=first_feature_vector_for_send,
-                is_send_tensor=True
-            )
-
-        # テンソルサイズに応じて通信レイテンシを設定
-        if self.split_computing_config.wait_latency:
-            wait_time = self.send_tensor_size_list[-1] / self.split_computing_config.bandwidth
-            print(f"Communication latency : {wait_time} seconds")
-            time.sleep(wait_time)
-
         return first_feature_vector_for_send
     
     def _delete_already_sent_first_feature_vector_indices(
@@ -164,18 +139,6 @@ class Edge(Base):
     ) -> CausalLMOutputWithPast:
         second_feature_vector_for_send = second_feature_vector_for_send.to(self.device) #.float()
 
-        if self.split_computing_config.measure_tensor_size_method is not None:
-            print(f"{second_feature_vector_for_send.shape}")
-            self.measure_tensor_size_and_save_to_file(
-                tensor=second_feature_vector_for_send,
-                is_send_tensor=False
-            )
-
-        if self.split_computing_config.wait_latency:
-            wait_time = self.send_tensor_size_list[-1] / self.split_computing_config.bandwidth
-            print(f"Communication latency : {wait_time} seconds")
-            time.sleep(wait_time)
-
         if self.split_computing_config.use_split_sent_cache:
             self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index] = torch.cat((
                 self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index], 
@@ -195,7 +158,7 @@ class Edge(Base):
         return output
 
     # ロジットから次のトークンを選択する
-    def select_next_token(
+    def sample_next_token(
             self,
             logits: torch.Tensor,
             config: SimplifiedGenerationConfig
@@ -244,68 +207,3 @@ class Edge(Base):
         next_tokens = torch.multinomial(probs, num_samples=1)[:, None, 0]
 
         return next_tokens
-    
-
-    # テンソルのシリアル化サイズ(bit)を測定する
-    def measure_tensor_size_and_save_to_file(
-            self,
-            tensor: torch.Tensor,
-            is_send_tensor: bool
-        ) -> None:
-        buffer = io.BytesIO()
-
-        if self.split_computing_config.save_hidden_states_to_file:
-            if is_send_tensor:
-                save_filename = os.path.join("hidden_state_files", self.save_datetime_str, 'edge_to_cloud', str(self.send_counter).zfill(3))
-                self.send_counter += 1
-            else:
-                save_filename = os.path.join("hidden_state_files", self.save_datetime_str, 'cloud_to_edge', str(self.receive_counter).zfill(3))
-                self.receive_counter += 1
-            
-            os.makedirs(os.path.dirname(save_filename), exist_ok=True)
-
-        if self.split_computing_config.measure_tensor_size_method == 'numpy_save':
-            tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
-            np.save(buffer, tensor, allow_pickle=False)
-
-            if self.split_computing_config.save_hidden_states_to_file:
-                np.save(save_filename, tensor, allow_pickle=False)
-
-        elif self.split_computing_config.measure_tensor_size_method == 'numpy_savez_compressed':
-            tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
-            np.savez_compressed(buffer, tensor)
-
-            if self.split_computing_config.save_hidden_states_to_file:
-                np.savez_compressed(save_filename, tensor)
-            
-        elif self.split_computing_config.measure_tensor_size_method == 'torch':
-            torch.save(tensor, buffer)
-            
-            if self.split_computing_config.save_hidden_states_to_file:
-                torch.save(tensor, save_filename)
-
-        byte_size = len(buffer.getvalue())
-        bit_size = byte_size * 8
-        
-        if is_send_tensor:
-            self.send_tensor_size_list.append(bit_size)
-        else:
-            self.receive_tensor_size_list.append(bit_size)
-
-    def save_inference_result_to_file(
-            self,
-            edge_split_computing_config: SplitComputingConfig,
-            cloud_split_computing_config: SplitComputingConfig,
-            llm_config: LlmConfig,
-            simplified_generation_config: SimplifiedGenerationConfig,
-            output_text: str
-        ) -> None:
-        save_filename = os.path.join("hidden_state_files", self.save_datetime_str, 'output_text.txt')
-
-        with open(save_filename, 'w') as f:
-            print(edge_split_computing_config, file=f)
-            print(cloud_split_computing_config, file=f)
-            print(llm_config, file=f)
-            print(simplified_generation_config, file=f)
-            print(file=f)
-            print(output_text, file=f)

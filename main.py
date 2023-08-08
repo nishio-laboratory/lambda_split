@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, Prompter, export_split_model_torchinfo_summary
+from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLogger, Prompter
 
 
 def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
@@ -69,9 +69,6 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
     edge = Edge(edge_split_computing_config, llm_config)
     cloud = Cloud(cloud_split_computing_config, llm_config)
 
-    # Export torchinfo summary
-    export_split_model_torchinfo_summary(llm_config, edge, cloud, export_dir='torchinfo_summary_log')
-
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
 
@@ -98,7 +95,12 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         inputs = edge.tokenizer(prompt, return_tensors="pt")
         input_ids = inputs["input_ids"].to(edge.device)
 
-        start = time.time()
+        split_computing_logger = SplitComputingLogger(
+            edge_split_computing_config, 
+            cloud_split_computing_config, 
+            llm_config, 
+            simplified_generation_config
+        )
 
         for idx in tqdm(range(simplified_generation_config.max_new_tokens)):
             print(idx)
@@ -112,62 +114,56 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             second_split_layer_relative_index = rng.integers(0, edge.num_second_split_layer_indices)
             second_split_layer_index = edge.second_split_layer_indices[second_split_layer_relative_index]
 
+            inference_start_time = time.perf_counter()
+
             ## First model : 0 から first_split_layer_index の層まで推論する
             first_feature_vector_for_send = edge.infer_first_model(input_ids, first_split_layer_index)
+            first_model_inference_time = time.perf_counter()
 
             ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
             second_feature_vector_for_send = cloud.infer_second_model(first_feature_vector_for_send, first_split_layer_index, second_split_layer_index)
+            second_model_inference_time = time.perf_counter()
             
-            ## Third model : second_split_layer_index から 最後の層 (self.num_decoder_layers) まで推論する
+            ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
             output = edge.infer_third_model(second_feature_vector_for_send, second_split_layer_index)
+            third_model_inference_time = time.perf_counter()
 
             ## 推論結果のロジットから次のトークンを選択する
-            next_tokens = edge.select_next_token(output.logits, simplified_generation_config)
+            next_tokens = edge.sample_next_token(output.logits, simplified_generation_config)
+            token_sampling_time = time.perf_counter()
             
+            # 次のトークンを追加する
+            output_ids = torch.cat([input_ids, next_tokens], dim=-1)
+
+            # Loggerを更新する
+            split_computing_logger.update(
+                first_split_layer_index,
+                second_split_layer_index,
+                first_feature_vector_for_send,
+                second_feature_vector_for_send,
+                output.logits,
+                inference_start_time,
+                first_model_inference_time,
+                second_model_inference_time,
+                third_model_inference_time,
+                token_sampling_time
+            )
+
+            # デトークナイズされたテキストを出力
+            output_text = edge.tokenizer.decode(output_ids[0])
+            yield_str = prompter.get_response(output_text) + '\n\n' + split_computing_logger.get_yield_str()
+            yield yield_str
+
             # EOS トークンが生成されたら終了する
             if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
                 break
-            
-            # 次のトークンを input_ids に追加する
-            input_ids = torch.cat([input_ids, next_tokens], dim=-1)
+            else:
+                input_ids = output_ids
 
-            # デトークナイズされたテキストを出力
-            cur = time.time()
-            output_text = edge.tokenizer.decode(input_ids[0])
-            yield_str = prompter.get_response(output_text) + '\n\n\n' + \
-                '(Split Computing Info)\n' + \
-                f'First model  : {list(range(0, first_split_layer_index))}\n' + \
-                f'Second model : {list(range(first_split_layer_index, second_split_layer_index))}\n' + \
-                f'Third model  : {list(range(second_split_layer_index, edge.num_decoder_layers))}\n' + \
-                f'({idx + 1} tokens, {cur - start:.2f} seconds, {(idx + 1) / (cur - start):.2f} tps)'
-            yield yield_str
+        print(yield_str)
 
-
-        print(output_text)
-        print()
-
-        end = time.time()
-        print(f'Inference time : {end - start} seconds')
-        print(f'Number of generated tokens : {idx} tokens')
-        print(f'Tokens per second : {(end - start) / idx} tps')
-
-        if edge_split_computing_config.measure_tensor_size_method is not None:
-            total_bit_send = sum(edge.send_tensor_size_list) / (1024 ** 2)
-            total_bit_receive = sum(edge.receive_tensor_size_list) / (1024 ** 2)
-            print(f'{total_bit_send=} Mbit, {total_bit_receive=} Mbit')
-            print()
-
-            print(f'{edge.send_tensor_size_list=}')
-            print(f'{edge.receive_tensor_size_list=}')
-
-        if edge_split_computing_config.save_hidden_states_to_file:
-            edge.save_inference_result_to_file(
-                edge_split_computing_config, 
-                cloud_split_computing_config, 
-                llm_config, 
-                simplified_generation_config,
-                output_text
-            )
+        # ログを出力
+        split_computing_logger.save_result_to_file(output_ids, output_text)
 
         edge.free_memory()
         # cloud.free_memory()
