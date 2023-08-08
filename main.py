@@ -38,7 +38,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         'meta-llama/Llama-2-13b-chat-hf',
         'meta-llama/Llama-2-70b-chat-hf',
     ]
-    ## LLaMa : https://huggingface.co/decapoda-research
+    ## LLaMa : https://huggingface.co/huggyllama
     base_model_list_llama = [
         'huggyllama/llama-7b',
         'huggyllama/llama-13b',
@@ -70,12 +70,16 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
     cloud = Cloud(cloud_split_computing_config, llm_config)
 
     # Export torchinfo summary
-    export_split_model_torchinfo_summary(llm_config.base_model, edge, cloud, export_dir='torchinfo_summary_log')
+    export_split_model_torchinfo_summary(llm_config, edge, cloud, export_dir='torchinfo_summary_log')
 
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
 
-    def infer(message, history, max_new_tokens, do_sample, temperature, top_k, top_p):
+    def infer(message, history, max_new_tokens, do_sample, temperature, top_k, top_p, **kwargs):
+        # 毎推論時に呼び出す必要がある初期化処理
+        edge.init_inference()
+        cloud.init_inference()
+
         # テキスト生成の Config
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=max_new_tokens,
@@ -129,17 +133,17 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
             # デトークナイズされたテキストを出力
             cur = time.time()
-
-            yield_str = prompter.get_response(edge.tokenizer.decode(input_ids[0])) + '\n\n\n' + \
+            output_text = edge.tokenizer.decode(input_ids[0])
+            yield_str = prompter.get_response(output_text) + '\n\n\n' + \
                 '(Split Computing Info)\n' + \
                 f'First model  : {list(range(0, first_split_layer_index))}\n' + \
                 f'Second model : {list(range(first_split_layer_index, second_split_layer_index))}\n' + \
                 f'Third model  : {list(range(second_split_layer_index, edge.num_decoder_layers))}\n' + \
-                f'({idx + 1} tokens, {cur - start:.2f} seconds, {idx / (cur - start):.2f} tps)'
+                f'({idx + 1} tokens, {cur - start:.2f} seconds, {(idx + 1) / (cur - start):.2f} tps)'
             yield yield_str
 
 
-        print(edge.tokenizer.decode(input_ids[0]))
+        print(output_text)
         print()
 
         end = time.time()
@@ -156,11 +160,17 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             print(f'{edge.send_tensor_size_list=}')
             print(f'{edge.receive_tensor_size_list=}')
 
-        edge.reset_split_sent_cache()
-        cloud.reset_split_sent_cache()
+        if edge_split_computing_config.save_hidden_states_to_file:
+            edge.save_inference_result_to_file(
+                edge_split_computing_config, 
+                cloud_split_computing_config, 
+                llm_config, 
+                simplified_generation_config,
+                output_text
+            )
 
         edge.free_memory()
-        cloud.free_memory()
+        # cloud.free_memory()
 
 
     if show_ui:
@@ -192,17 +202,16 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
         # テキスト生成の Config
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=500,
-            do_sample=True,
+            do_sample=False,
             use_split_past_cache=False,
             temperature=1,
             top_k=50,
             top_p=0.9
         )
 
-        while True:
-            message = input('Input text : ')
-            for response in infer(message, None, **asdict(simplified_generation_config)):
-                print(response)
+        message = 'Please tell me about Japan.' # input('Input text : ')
+        for response in infer(message, None, **asdict(simplified_generation_config)):
+            print(response)
             
 
 if __name__ == '__main__':
@@ -212,4 +221,4 @@ if __name__ == '__main__':
     first_split_layer_indices = np.array([1, 2, 3, 4, 5])
     second_split_layer_indices = np.array([-5, -4, -3, -2, -1]) + 32
 
-    main(first_split_layer_indices, second_split_layer_indices, 42, True)
+    main(first_split_layer_indices, second_split_layer_indices, 42, False)

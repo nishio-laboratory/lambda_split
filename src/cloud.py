@@ -22,19 +22,20 @@ class Cloud(Base):
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
         self.second_model = self._get_largest_second_model()
 
+        # 毎推論時に呼び出す必要がある初期化処理
+        self.init_inference()
+
+    def init_inference(self):
         if self.split_computing_config.use_split_sent_cache:
-            self.reset_split_sent_cache()
+            # 過去の first_feature_vector を split_layer_index ごとに保存しておく
+            self.stored_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            for split_layer_index in self.first_split_layer_indices:
+                self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
 
-    def reset_split_sent_cache(self):
-        # 過去の first_feature_vector を split_layer_index ごとに保存しておく
-        self.stored_first_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
-        for split_layer_index in self.first_split_layer_indices:
-            self.stored_first_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.num_embed_dims), dtype=torch.half).to(self.device)
-
-        # すでに送信した second_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
-        self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
-        for split_layer_index in self.second_split_layer_indices:
-            self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
+            # すでに送信した second_feature_vector_with_past の latest_past_index を split_layer_index ごとに保存しておく
+            self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.num_decoder_layers + 1)]
+            for split_layer_index in self.second_split_layer_indices:
+                self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
 
     def _get_largest_second_model(self):
         second_model = self.load_model(position='second')

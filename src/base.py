@@ -1,4 +1,4 @@
-import copy
+import io
 from typing import List, Union
 import gc
 
@@ -16,6 +16,8 @@ class Base:
             split_computing_config: SplitComputingConfig,
             llm_config: LlmConfig
     ) -> None:
+        self.split_computing_config = split_computing_config
+
         self.first_split_layer_indices = sorted(list(set(split_computing_config.first_split_layer_indices)))
         self.second_split_layer_indices = sorted(list(set(split_computing_config.second_split_layer_indices)))
 

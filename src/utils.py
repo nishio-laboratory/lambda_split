@@ -24,12 +24,15 @@ class SplitComputingConfig(object):
     bandwidth: int = None
     dropout_rate: float = 1.0
     quantize_method: str = None
-    save_split_model_output_to_file: bool = False
+    save_hidden_states_to_file: bool = True
 
     def __post_init__(self):
         if self.wait_latency:
             assert self.measure_tensor_size_method is not None
             assert self.bandwidth is not None
+
+        if self.save_hidden_states_to_file:
+            assert self.use_split_sent_cache
 
 
 @dataclass
@@ -109,35 +112,12 @@ class Prompter(object):
         return output.split(self.template["response_split"])[1].strip()
 
 
-# テンソルのシリアル化サイズ(bit)を測定する関数
-def measure_tensor_size(
-        tensor: torch.Tensor,
-        method: str = 'numpy_save'
-    ) -> int:
-    buffer = io.BytesIO()
-
-    if method == 'numpy_save':
-        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
-        np.save(buffer, tensor, allow_pickle=False)
-
-    elif method == 'numpy_savez_compressed':
-        tensor = tensor.to('cpu').detach().numpy().copy().astype(np.float16)
-        np.savez_compressed(buffer, tensor)
-        
-    elif method == 'torch':
-        torch.save(tensor, buffer)
-
-    byte_size = len(buffer.getvalue())
-    bit_size = byte_size * 8
-    return bit_size
-
-
-def export_split_model_torchinfo_summary(base_model, edge, cloud, export_dir: str = 'torchinfo_summary_log') -> None:
+def export_split_model_torchinfo_summary(llm_config, edge, cloud, export_dir: str = 'torchinfo_summary_log') -> None:
     dummy_sequence_length = 50
     dummy_input_ids = torch.randint(0, 1000, (1, dummy_sequence_length))
     dummy_inputs_embeds = torch.rand((1, dummy_sequence_length, edge.num_embed_dims))
 
-    export_dir = os.path.join(export_dir, f'{base_model}_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
+    export_dir = os.path.join(export_dir, f'{llm_config.base_model}_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
     os.makedirs(export_dir, exist_ok=True)
 
     
