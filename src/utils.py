@@ -187,8 +187,8 @@ class SplitComputingLogger(object):
         save_filename = os.path.join("log", self.save_datetime_str, 'main.txt')
 
         with open(save_filename, 'w') as f:
-            print(self.edge_split_computing_config, file=f)
-            print(self.cloud_split_computing_config, file=f)
+            print('Edge  : ', self.edge_split_computing_config, file=f)
+            print('Cloud : ', self.cloud_split_computing_config, file=f)
             print(self.llm_config, file=f)
             print(self.simplified_generation_config, file=f)
             print(file=f)

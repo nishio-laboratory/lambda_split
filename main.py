@@ -154,7 +154,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             yield_str = prompter.get_response(output_text) + '\n\n' + split_computing_logger.get_yield_str()
             yield yield_str
 
-            # EOS トークンが生成されたら終了する
+            # EOS トークンが生成されたら終了する, それ以外の場合はinput_idsを更新する
             if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
                 break
             else:
