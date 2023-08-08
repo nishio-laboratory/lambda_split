@@ -164,6 +164,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
         # ログを出力
         split_computing_logger.save_result_to_file(output_ids, output_text)
+        split_computing_logger.export_split_model_torchinfo_summary(edge, cloud)
 
         edge.free_memory()
         # cloud.free_memory()

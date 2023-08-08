@@ -251,15 +251,14 @@ class SplitComputingLogger(object):
 
     def export_split_model_torchinfo_summary(
             self,
-            llm_config, 
             edge, 
             cloud
         ) -> None:
         dummy_sequence_length = 50
         dummy_input_ids = torch.randint(0, 1000, (1, dummy_sequence_length)).long()
-        dummy_inputs_embeds = torch.rand(1, dummy_sequence_length, llm_config.num_embed_dims)
+        dummy_inputs_embeds = torch.rand(1, dummy_sequence_length, self.llm_config.num_embed_dims)
 
-        export_dir = os.path.join("log", self.save_datetime_str, "torchinfo_summary", f'{llm_config.base_model}_{edge.first_split_layer_indices}_{edge.second_split_layer_indices}')
+        export_dir = os.path.join("log", self.save_datetime_str, "torchinfo_summary")
         os.makedirs(export_dir, exist_ok=True)
         
         with open(os.path.join(export_dir, f'first_model.txt'), 'w') as f:
