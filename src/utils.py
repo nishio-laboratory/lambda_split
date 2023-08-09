@@ -102,6 +102,7 @@ class SplitComputingLogger(object):
         self.second_model_inference_time_history: List[float] = []
         self.third_model_inference_time_history: List[float] = []
         self.token_sampling_time_history: List[float] = []
+        self.total_inference_time_history: List[float] = []
 
         self.first_feature_vector_for_send_size_history: List[int] = []
         self.second_feature_vector_for_send_size_history: List[int] = []
@@ -130,6 +131,12 @@ class SplitComputingLogger(object):
         self.second_model_inference_time_history.append(second_model_inference_time - first_model_inference_time)
         self.third_model_inference_time_history.append(third_model_inference_time - second_model_inference_time)
         self.token_sampling_time_history.append(token_sampling_time - third_model_inference_time)
+
+        if self.num_generated_tokens == 0:
+            self.total_inference_time_history.append(token_sampling_time - self.start_time)
+        else:
+            self.total_inference_time_history.append(token_sampling_time - self.previous_token_sampling_time)
+        self.previous_token_sampling_time = token_sampling_time
 
         if self.edge_split_computing_config.measure_tensor_size_method:
             first_feature_vector_for_send_size = self.measure_tensor_size_and_save_to_file(
@@ -200,12 +207,25 @@ class SplitComputingLogger(object):
             print('Total receive size :', total_receive_size, '(Mbit)', file=f)
             print('Average bandwidth :', (total_send_size + total_receive_size) / total_time, '(Mbit/s)', file=f)
             print(file=f)
+            print('First split layer index history :', self.first_split_layer_index_history, file=f)
+            print('Second split layer index history :', self.second_split_layer_index_history, file=f)
+            print(file=f)
+            print('First feature vector for send size history :', self.first_feature_vector_for_send_size_history, file=f)
+            print('Second feature vector for send size history :', self.second_feature_vector_for_send_size_history, file=f)
+            print(file=f)
+            print('First model inference time history :', self.first_model_inference_time_history, file=f)
+            print('Second model inference time history :', self.second_model_inference_time_history, file=f)
+            print('Third model inference time history :', self.third_model_inference_time_history, file=f)
+            print('Token sampling time history :', self.token_sampling_time_history, file=f)
+            print('Total inference time history :', self.total_inference_time_history, file=f)
+            print(file=f)
+            print('Prompt :', file=f)
             print(output_text, file=f)
 
     def wait_communication_latency(self):
         wait_time = 0
-        wait_time += self.first_feature_vector_for_send_size_history[-1] / self.split_computing_config.bandwidth
-        wait_time += self.second_feature_vector_for_send_size_history[-1] / self.split_computing_config.bandwidth
+        wait_time += self.first_feature_vector_for_send_size_history[-1] / self.edge_split_computing_config.bandwidth
+        wait_time += self.second_feature_vector_for_send_size_history[-1] / self.edge_split_computing_config.bandwidth
         print(f"Communication latency : {wait_time} seconds")
         time.sleep(wait_time)
 
@@ -251,7 +271,7 @@ class SplitComputingLogger(object):
 
     def export_split_model_torchinfo_summary(
             self,
-            edge, 
+            edge,
             cloud
         ) -> None:
         dummy_sequence_length = 50
