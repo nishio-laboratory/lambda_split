@@ -34,9 +34,6 @@ class SplitComputingConfig(object):
             assert self.measure_tensor_size_method is not None
             assert self.bandwidth is not None
 
-        if self.save_hidden_states_to_file:
-            assert self.use_split_sent_cache
-
 
 @dataclass
 class LlmConfig(object):

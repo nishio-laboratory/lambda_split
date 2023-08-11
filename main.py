@@ -12,58 +12,13 @@ from src.edge import Edge
 from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLogger, Prompter
 
 
-def main(first_split_layer_indices, second_split_layer_indices, random_seed, show_ui):
-    # Edge での SplitComputingConfig
-    edge_split_computing_config = SplitComputingConfig(
-        device='cpu',
-        first_split_layer_indices=first_split_layer_indices,
-        second_split_layer_indices=second_split_layer_indices,
-        random_seed=random_seed,
-        use_split_sent_cache=True,
-    )
-
-    # Cloud での SplitComputingConfig
-    cloud_split_computing_config = SplitComputingConfig(
-        device='cuda',
-        first_split_layer_indices=first_split_layer_indices,
-        second_split_layer_indices=second_split_layer_indices,
-        random_seed=random_seed,
-        use_split_sent_cache=True,
-    )
-
-    # LLM の Config
-    ## LLaMa 2 : https://huggingface.co/meta-llama
-    base_model_list_llama2 = [ 
-        'meta-llama/Llama-2-7b-chat-hf',
-        'meta-llama/Llama-2-13b-chat-hf',
-        'meta-llama/Llama-2-70b-chat-hf',
-    ]
-    ## LLaMa : https://huggingface.co/huggyllama
-    base_model_list_llama = [
-        'huggyllama/llama-7b',
-        'huggyllama/llama-13b',
-        'huggyllama/llama-30b',
-        'huggyllama/llama-65b',
-        # 'decapoda-research/llama-7b-hf',
-        # 'decapoda-research/llama-13b-hf',
-        # 'decapoda-research/llama-30b-hf',
-        # 'decapoda-research/llama-65b-hf'
-    ]
-    lora_weights_list_llama = [
-        'tloen/alpaca-lora-7b',
-        'Angainor/alpaca-lora-13b',
-        'baseten/alpaca-30b',
-        'chansung/alpaca-lora-65b'
-    ]
-
-    # llm_config = LlmConfig(
-    #     base_model=base_model_list_llama2[0],
-    #     lora_weights=None
-    # )
-    llm_config = LlmConfig(
-        base_model=base_model_list_llama[0],
-        lora_weights=lora_weights_list_llama[0]
-    )
+def main(
+        edge_split_computing_config: SplitComputingConfig,
+        cloud_split_computing_config: SplitComputingConfig,
+        llm_config: LlmConfig,
+        random_seed: int,
+        show_ui: bool
+    ):
 
     # Edge と Cloud のインスタンス
     edge = Edge(edge_split_computing_config, llm_config)
@@ -71,6 +26,7 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
 
     # 乱数生成器
     rng = np.random.default_rng(random_seed)
+
 
     def infer(message, history, max_new_tokens, do_sample, temperature, top_k, top_p, **kwargs):
         # 毎推論時に呼び出す必要がある初期化処理
@@ -206,16 +162,71 @@ def main(first_split_layer_indices, second_split_layer_indices, random_seed, sho
             top_p=0.9
         )
 
-        message = 'Please tell me about Japan.' # input('Input text : ')
+        message = 'Please explain the difference among artificial intelligence, machine learning, and deep learning.' # input('Input text : ')
         for response in infer(message, None, **asdict(simplified_generation_config)):
             print(response)
-            
+
+
 
 if __name__ == '__main__':
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    first_split_layer_indices = np.array([1, 2, 3, 4, 5])
-    second_split_layer_indices = np.array([-5, -4, -3, -2, -1]) + 32
+    for n in [0, 1, 2, 4, 8]:
+        first_split_layer_indices = np.array([n])
+        second_split_layer_indices = np.array([-n]) + 40
+        random_seed = 42
 
-    main(first_split_layer_indices, second_split_layer_indices, 42, False)
+        # Edge での SplitComputingConfig
+        edge_split_computing_config = SplitComputingConfig(
+            device='cpu',
+            first_split_layer_indices=first_split_layer_indices,
+            second_split_layer_indices=second_split_layer_indices,
+            random_seed=random_seed,
+            use_split_sent_cache=False,
+        )
+
+        # Cloud での SplitComputingConfig
+        cloud_split_computing_config = SplitComputingConfig(
+            device='cuda',
+            first_split_layer_indices=first_split_layer_indices,
+            second_split_layer_indices=second_split_layer_indices,
+            random_seed=random_seed,
+            use_split_sent_cache=False,
+        )
+
+        # LLM の Config
+        ## LLaMa 2 : https://huggingface.co/meta-llama
+        base_model_list_llama2 = [ 
+            'meta-llama/Llama-2-7b-chat-hf',
+            'meta-llama/Llama-2-13b-chat-hf',
+            'meta-llama/Llama-2-70b-chat-hf',
+        ]
+        ## LLaMa : https://huggingface.co/huggyllama
+        base_model_list_llama = [
+            'huggyllama/llama-7b',
+            'huggyllama/llama-13b',
+            'huggyllama/llama-30b',
+            'huggyllama/llama-65b',
+            # 'decapoda-research/llama-7b-hf',
+            # 'decapoda-research/llama-13b-hf',
+            # 'decapoda-research/llama-30b-hf',
+            # 'decapoda-research/llama-65b-hf'
+        ]
+        lora_weights_list_llama = [
+            'tloen/alpaca-lora-7b',
+            'Angainor/alpaca-lora-13b',
+            'baseten/alpaca-30b',
+            'chansung/alpaca-lora-65b'
+        ]
+
+        # llm_config = LlmConfig(
+        #     base_model=base_model_list_llama2[0],
+        #     lora_weights=None
+        # )
+        llm_config = LlmConfig(
+            base_model=base_model_list_llama[1],
+            lora_weights=lora_weights_list_llama[1]
+        )
+
+        main(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, False)

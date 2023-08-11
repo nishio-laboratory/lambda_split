@@ -45,7 +45,7 @@ class Base:
 
         self.device = split_computing_config.device
 
-        if self.device == "cuda":
+        if "cuda" in self.device:
             assert torch.cuda.is_available()
         elif self.device == "mps":
             assert torch.backends.mps.is_available()
