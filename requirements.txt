@@ -6,3 +6,5 @@ torchinfo
 tqdm
 gradio
 sentencepiece
+fastapi[all]
+uvicorn
