@@ -157,7 +157,7 @@ def main(
             top_p=0.9
         )
 
-        message = 'Please explain the difference among artificial intelligence, machine learning, and deep learning.' # input('Input text : ')
+        message = 'What is the difference between AI, ML and DL?' # input('Input text : ')
         for response in infer_each_request(message, None, **asdict(simplified_generation_config)):
             print(response)
 
@@ -167,28 +167,10 @@ if __name__ == '__main__':
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    n = 0
-    first_split_layer_indices = np.array([n])
-    second_split_layer_indices = np.array([-n])
+    n = 12
+    first_split_layer_indices = np.arange(n)
+    second_split_layer_indices = -first_split_layer_indices
     random_seed = 42
-
-    # Edge での SplitComputingConfig
-    edge_split_computing_config = SplitComputingConfig(
-        device='mps',
-        first_split_layer_indices=first_split_layer_indices,
-        second_split_layer_indices=second_split_layer_indices,
-        random_seed=random_seed,
-        use_split_sent_cache=False,
-    )
-
-    # Cloud での SplitComputingConfig
-    cloud_split_computing_config = SplitComputingConfig(
-        device='mps',
-        first_split_layer_indices=first_split_layer_indices,
-        second_split_layer_indices=second_split_layer_indices,
-        random_seed=random_seed,
-        use_split_sent_cache=False,
-    )
 
     # LLM の Config
     ## LLaMa 2 : https://huggingface.co/meta-llama
@@ -210,6 +192,10 @@ if __name__ == '__main__':
         'baseten/alpaca-30b',
         'chansung/alpaca-lora-65b'
     ]
+    base_model_list_vicuna = [
+        'lmsys/vicuna-7b-v1.5',
+        'lmsys/vicuna-13b-v1.5'
+    ]
 
     llm_config = LlmConfig(
         base_model=base_model_list_llama2[0],
@@ -221,5 +207,23 @@ if __name__ == '__main__':
     # )
 
     second_split_layer_indices += llm_config.num_decoder_layers
+
+    # Edge での SplitComputingConfig
+    edge_split_computing_config = SplitComputingConfig(
+        device='cuda',
+        first_split_layer_indices=first_split_layer_indices,
+        second_split_layer_indices=second_split_layer_indices,
+        random_seed=random_seed,
+        use_split_sent_cache=True,
+    )
+
+    # Cloud での SplitComputingConfig
+    cloud_split_computing_config = SplitComputingConfig(
+        device='cuda',
+        first_split_layer_indices=first_split_layer_indices,
+        second_split_layer_indices=second_split_layer_indices,
+        random_seed=random_seed,
+        use_split_sent_cache=True,
+    )
 
     main(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, False)

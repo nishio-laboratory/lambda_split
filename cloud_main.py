@@ -59,7 +59,7 @@ def cloud_main(
             return StreamingResponse(io.BytesIO(second_feature_vector_for_send.tobytes()), media_type="application/octet-stream")
         
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
 
 if __name__ == '__main__':
@@ -73,11 +73,11 @@ if __name__ == '__main__':
 
     # Cloud での SplitComputingConfig
     cloud_split_computing_config = SplitComputingConfig(
-        device='mps',
+        device='cuda',
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_sent_cache=False,
+        use_split_sent_cache=True
     )
 
     # LLM の Config

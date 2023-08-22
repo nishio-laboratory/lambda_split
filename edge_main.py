@@ -177,20 +177,20 @@ if __name__ == '__main__':
 
     # Edge での SplitComputingConfig
     edge_split_computing_config = SplitComputingConfig(
-        device='mps',
+        device='cpu',
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_sent_cache=False,
+        use_split_sent_cache=True,
     )
 
     # Cloud での SplitComputingConfig
     cloud_split_computing_config = SplitComputingConfig(
-        device='mps',
+        device='cpu',
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_sent_cache=False,
+        use_split_sent_cache=True,
     )
 
     # LLM の Config
