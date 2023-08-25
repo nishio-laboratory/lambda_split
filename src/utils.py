@@ -106,12 +106,12 @@ class SplitComputingLogger(object):
 
         self.save_datetime_str = datetime.datetime.now().strftime('%y%m%d_%H%M%S')
 
+        self.rng = np.random.default_rng(self.edge_split_computing_config.random_seed)
+
         self.start_time = time.perf_counter()
 
     def update(
             self,
-            first_split_layer_index: int,
-            second_split_layer_index: int,
             first_feature_vector_for_send: torch.Tensor,
             second_feature_vector_for_send: torch.Tensor,
             logits: torch.Tensor,
@@ -121,6 +121,9 @@ class SplitComputingLogger(object):
             third_model_inference_time: float,
             token_sampling_time: float
         ):
+        first_split_layer_index = self.rng.choice(self.edge_split_computing_config.first_split_layer_indices)
+        second_split_layer_index = self.rng.choice(self.edge_split_computing_config.second_split_layer_indices)
+
         self.first_split_layer_index_history.append(first_split_layer_index)
         self.second_split_layer_index_history.append(second_split_layer_index)
 

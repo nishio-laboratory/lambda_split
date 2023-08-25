@@ -57,12 +57,21 @@ class Cloud(Base):
     
     def infer_second_model(
         self, 
-        first_feature_vector_for_send: torch.Tensor,
-        first_split_layer_index: int,
-        second_split_layer_index: int
+        first_feature_vector_for_send: torch.Tensor
     ) -> torch.Tensor:
         first_feature_vector_for_send = first_feature_vector_for_send.to(self.device).half()
 
+        ## 分割するレイヤの箇所を乱数で決める (second_split_layer_index も一度に決めてしまうと、shuffle された first_feature_vector を復元できないので、first_split_layer_index とは別に決める)
+        first_split_layer_index = self.rng.choice(self.first_split_layer_indices)
+
+        # shuffle された first_feature_vector を 元に戻す
+        if self.split_computing_config.do_shuffle:
+            first_feature_vector_for_send = torch.flatten(first_feature_vector_for_send)
+            randomized_indices = self.rng.permutation(len(first_feature_vector_for_send)) # シャッフル時のインデックスを再現
+            reverse_indices = torch.from_numpy(np.argsort(randomized_indices)) # インデックスを元に戻す
+            first_feature_vector_for_send = first_feature_vector_for_send[reverse_indices].reshape(1, -1, self.llm_config.num_embed_dims)
+        
+        # first_feature_vector を復元
         if self.split_computing_config.use_split_sent_cache:
             self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index] = torch.cat((
                 self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index], 
@@ -71,7 +80,10 @@ class Cloud(Base):
             )
             first_feature_vector = self.stored_first_feature_vector_with_past_for_each_split_layer_index[first_split_layer_index]
         else:
-            first_feature_vector = first_feature_vector_for_send
+            first_feature_vector = first_feature_vector_for_send            
+
+        ## 分割するレイヤの箇所を乱数で決める
+        second_split_layer_index = self.rng.choice(self.second_split_layer_indices)
 
         with torch.no_grad():
             second_feature_vector = self.second_model(
@@ -87,6 +99,14 @@ class Cloud(Base):
             )
         else:
             second_feature_vector_for_send = second_feature_vector
+
+        # shuffle
+        if self.split_computing_config.do_shuffle:
+            # flatten してから shuffle して再度 reshape する
+            second_feature_vector_for_send = torch.flatten(second_feature_vector_for_send)
+            randomized_indices = self.rng.permutation(len(second_feature_vector_for_send))
+            second_feature_vector_for_send = second_feature_vector_for_send[torch.from_numpy(randomized_indices)]
+            second_feature_vector_for_send = second_feature_vector_for_send.reshape(1, -1, self.llm_config.num_embed_dims)
 
         if self.split_computing_config.dropout_rate < 1.0:
             second_feature_vector_for_send = torch.nn.functional.dropout(

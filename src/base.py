@@ -45,6 +45,9 @@ class Base:
 
         self.device = split_computing_config.device
 
+        # 乱数生成器
+        self.rng = np.random.default_rng(self.split_computing_config.random_seed)
+
         if "cuda" in self.device:
             assert torch.cuda.is_available()
         elif self.device == "mps":

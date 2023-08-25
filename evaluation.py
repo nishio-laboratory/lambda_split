@@ -23,9 +23,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
     edge = Edge(edge_split_computing_config, llm_config)
     cloud = Cloud(cloud_split_computing_config, llm_config)
 
-    # 乱数生成器
-    rng = np.random.default_rng(random_seed)
-
 
     def infer_from_first_feature_vector(message, history, max_new_tokens, do_sample, temperature, top_k, top_p, **kwargs):
         # 毎推論時に呼び出す必要がある初期化処理
@@ -62,23 +59,20 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
                 print(idx)
 
                 # Triadic split computing : edge -> cloud -> edge
-                ## 分割するレイヤの箇所を乱数で決める
-                first_split_layer_index = rng.choice(edge.first_split_layer_indices)
-                second_split_layer_index = rng.choice(edge.second_split_layer_indices)
-
                 inference_start_time = time.perf_counter()
 
                 ## First model : 0 から first_split_layer_index の層まで推論する
                 first_feature_vector_for_send_filename = os.path.join(log_dir, 'hidden_state_files', 'edge_to_cloud', str(idx).zfill(3) + '.npy')
-                first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename)[:, -1:, :])
+                # first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename)[:, -1:, :])
+                first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename))
                 first_model_inference_time = time.perf_counter()
 
                 ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
-                second_feature_vector_for_send = cloud.infer_second_model(first_feature_vector_for_send, first_split_layer_index, second_split_layer_index)
+                second_feature_vector_for_send = cloud.infer_second_model(first_feature_vector_for_send)
                 second_model_inference_time = time.perf_counter()
 
                 ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
-                output = edge.infer_third_model(second_feature_vector_for_send, second_split_layer_index)
+                output = edge.infer_third_model(second_feature_vector_for_send)
                 third_model_inference_time = time.perf_counter()
 
                 ## 推論結果のロジットから次のトークンを選択する
@@ -90,8 +84,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
 
                 # Loggerを更新する
                 split_computing_logger.update(
-                    first_split_layer_index,
-                    second_split_layer_index,
                     first_feature_vector_for_send,
                     second_feature_vector_for_send,
                     output.logits,
@@ -160,24 +152,22 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
                 print(idx)
 
                 # Triadic split computing : edge -> cloud -> edge
-                ## 分割するレイヤの箇所を乱数で決める
-                first_split_layer_index = rng.choice(edge.first_split_layer_indices)
-                second_split_layer_index = rng.choice(edge.second_split_layer_indices)
-
                 inference_start_time = time.perf_counter()
 
                 ## First model : 0 から first_split_layer_index の層まで推論する
                 first_feature_vector_for_send_filename = os.path.join(log_dir, 'hidden_state_files', 'edge_to_cloud', str(idx).zfill(3) + '.npy')
-                first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename)[:, -1:, :])
+                # first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename)[:, -1:, :])
+                first_feature_vector_for_send = torch.from_numpy(np.load(first_feature_vector_for_send_filename))
                 first_model_inference_time = time.perf_counter()
 
                 ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
                 second_feature_vector_for_send_filename = os.path.join(log_dir, 'hidden_state_files', 'cloud_to_edge', str(idx).zfill(3) + '.npy')
-                second_feature_vector_for_send = torch.from_numpy(np.load(second_feature_vector_for_send_filename)[:, -1:, :])
+                # second_feature_vector_for_send = torch.from_numpy(np.load(second_feature_vector_for_send_filename)[:, -1:, :])
+                second_feature_vector_for_send = torch.from_numpy(np.load(second_feature_vector_for_send_filename))
                 second_model_inference_time = time.perf_counter()
 
                 ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
-                output = edge.infer_third_model(second_feature_vector_for_send, second_split_layer_index)
+                output = edge.infer_third_model(second_feature_vector_for_send)
                 third_model_inference_time = time.perf_counter()
 
                 ## 推論結果のロジットから次のトークンを選択する
@@ -189,8 +179,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
 
                 # Loggerを更新する
                 split_computing_logger.update(
-                    first_split_layer_index,
-                    second_split_layer_index,
                     first_feature_vector_for_send,
                     second_feature_vector_for_send,
                     output.logits,
@@ -302,7 +290,7 @@ def main():
 
     second_split_layer_indices += llm_config.num_decoder_layers
 
-    log_dir = f'log/230822_084944'
+    log_dir = f'log/230824_044436'
     infer_finetuned_model_from_non_finetuned_feature_vector(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, log_dir)
 
 

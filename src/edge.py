@@ -83,10 +83,12 @@ class Edge(Base):
 
     def infer_first_model(
             self, 
-            input_ids: torch.LongTensor,
-            first_split_layer_index: int
+            input_ids: torch.LongTensor
     ) -> torch.Tensor:
         input_ids = input_ids.to(self.device) #.long()
+
+        ## 分割するレイヤの箇所を乱数で決める
+        first_split_layer_index = self.rng.choice(self.first_split_layer_indices)
 
         # first_model の推論
         with torch.no_grad():
@@ -103,6 +105,15 @@ class Edge(Base):
             )
         else:
             first_feature_vector_for_send = first_feature_vector
+
+        # shuffle
+        if self.split_computing_config.do_shuffle:
+            # flatten してから shuffle して再度 reshape する
+            first_feature_vector_for_send = torch.flatten(first_feature_vector_for_send)
+            randomized_indices = self.rng.permutation(len(first_feature_vector_for_send))
+            print(randomized_indices)
+            first_feature_vector_for_send = first_feature_vector_for_send[torch.from_numpy(randomized_indices)]
+            first_feature_vector_for_send = first_feature_vector_for_send.reshape(1, -1, self.llm_config.num_embed_dims)
 
         # ドロップアウト
         if self.split_computing_config.dropout_rate < 1.0:
@@ -134,10 +145,18 @@ class Edge(Base):
 
     def infer_third_model(
             self, 
-            second_feature_vector_for_send: torch.Tensor,
-            second_split_layer_index: int
+            second_feature_vector_for_send: torch.Tensor
     ) -> CausalLMOutputWithPast:
         second_feature_vector_for_send = second_feature_vector_for_send.to(self.device) #.float()
+
+        second_split_layer_index = self.rng.choice(self.second_split_layer_indices)
+
+        # shuffle された second_feature_vector を 元に戻す
+        if self.split_computing_config.do_shuffle:
+            second_feature_vector_for_send = torch.flatten(second_feature_vector_for_send)
+            randomized_indices = self.rng.permutation(len(second_feature_vector_for_send)) # シャッフル時のインデックスを再現
+            reverse_indices = torch.from_numpy(np.argsort(randomized_indices)) # インデックスを元に戻す
+            second_feature_vector_for_send = second_feature_vector_for_send[reverse_indices].reshape(1, -1, self.llm_config.num_embed_dims)
 
         if self.split_computing_config.use_split_sent_cache:
             self.stored_second_feature_vector_with_past_for_each_split_layer_index[second_split_layer_index] = torch.cat((
