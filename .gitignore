@@ -163,3 +163,4 @@ nohup.out
 *.pth
 log/
 *.npy
+*.png

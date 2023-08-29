@@ -31,7 +31,7 @@ class FirstLlamaModel(LlamaModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.Tensor:
+    ) -> BaseModelOutputWithPast:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -135,12 +135,18 @@ class FirstLlamaModel(LlamaModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
-
-
-        return hidden_states
+        
+        for idx in range(first_split_layer_index, self.num_decoder_layers):
+            if output_hidden_states:
+                all_hidden_states += (None,)
+            if output_attentions:
+                all_self_attns += (None,)
+            if use_cache:
+                next_decoder_cache += (None,)
 
         ''' ここをコメントアウト
         hidden_states = self.norm(hidden_states)
+        '''
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -155,7 +161,6 @@ class FirstLlamaModel(LlamaModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-        '''
 
 
 class FirstLlamaForCausalLM(LlamaForCausalLM):
@@ -194,7 +199,7 @@ class FirstLlamaForCausalLM(LlamaForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.Tensor:
+    ) -> BaseModelOutputWithPast:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -269,7 +274,7 @@ class SecondLlamaModel(LlamaModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.Tensor:
+    ) -> BaseModelOutputWithPast:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -292,7 +297,7 @@ class SecondLlamaModel(LlamaModel):
         past_key_values_length = 0
 
         if past_key_values is not None:
-            past_key_values_length = past_key_values[0][0].shape[2]
+            past_key_values_length = past_key_values[first_split_layer_index][0].shape[2]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if position_ids is None:
@@ -328,6 +333,14 @@ class SecondLlamaModel(LlamaModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
+
+        for idx in range(0, first_split_layer_index):
+            if output_hidden_states:
+                all_hidden_states += (None,)
+            if output_attentions:
+                all_self_attns += (None,)
+            if use_cache:
+                next_decoder_cache += (None,)
 
         self.num_decoder_layers = len(self.layers)
         print('Second :', list(range(first_split_layer_index, second_split_layer_index)))
@@ -374,11 +387,17 @@ class SecondLlamaModel(LlamaModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-
-        return hidden_states
+        for idx in range(second_split_layer_index, self.num_decoder_layers):
+            if output_hidden_states:
+                all_hidden_states += (None,)
+            if output_attentions:
+                all_self_attns += (None,)
+            if use_cache:
+                next_decoder_cache += (None,)
 
         ''' ここをコメントアウト
         hidden_states = self.norm(hidden_states)
+        '''
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -393,7 +412,6 @@ class SecondLlamaModel(LlamaModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-        '''
 
 
 class SecondLlamaForCausalLM(LlamaForCausalLM):
@@ -439,7 +457,7 @@ class SecondLlamaForCausalLM(LlamaForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None
-    ) -> torch.Tensor:
+    ) -> BaseModelOutputWithPast:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -537,7 +555,7 @@ class ThirdLlamaModel(LlamaModel):
         past_key_values_length = 0
 
         if past_key_values is not None:
-            past_key_values_length = past_key_values[0][0].shape[2]
+            past_key_values_length = past_key_values[second_split_layer_index][0].shape[2]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if position_ids is None:
@@ -576,6 +594,14 @@ class ThirdLlamaModel(LlamaModel):
 
         self.num_decoder_layers = len(self.layers)
         print('Third  :', list(range(second_split_layer_index, self.num_decoder_layers)))
+
+        for idx in range(0, second_split_layer_index):
+            if output_hidden_states:
+                all_hidden_states += (None,)
+            if output_attentions:
+                all_self_attns += (None,)
+            if use_cache:
+                next_decoder_cache += (None,)
 
         for idx in range(second_split_layer_index, self.num_decoder_layers):
             decoder_layer = self.layers[idx]
