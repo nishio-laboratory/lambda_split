@@ -35,6 +35,8 @@ class Cloud(Base):
             for split_layer_index in self.second_split_layer_indices:
                 self.sent_latest_past_index_of_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = 0
 
+        self.past_key_values = None
+
     def _get_largest_second_model(self):
         second_model = self.load_model(position='second')
 
@@ -86,11 +88,17 @@ class Cloud(Base):
         second_split_layer_index = self.rng.choice(self.second_split_layer_indices)
 
         with torch.no_grad():
-            second_feature_vector = self.second_model(
+            second_model_output = self.second_model(
                 inputs_embeds=first_feature_vector, 
                 first_split_layer_index=first_split_layer_index, 
-                second_split_layer_index=second_split_layer_index
+                second_split_layer_index=second_split_layer_index,
+                use_cache=self.split_computing_config.use_past_key_values,
+                past_key_values=self.past_key_values
             )
+            second_feature_vector = second_model_output.last_hidden_state
+
+            if self.split_computing_config.use_past_key_values:
+                self.past_key_values = second_model_output.past_key_values
 
         if self.split_computing_config.use_split_sent_cache:
             second_feature_vector_for_send = self._delete_already_sent_second_feature_vector_indices(

@@ -33,7 +33,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
-            use_split_past_cache=False,
             temperature=temperature,
             top_k=top_k,
             top_p=top_p
@@ -126,7 +125,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
-            use_split_past_cache=False,
             temperature=temperature,
             top_k=top_k,
             top_p=top_p
@@ -217,7 +215,6 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
     simplified_generation_config = SimplifiedGenerationConfig(
         max_new_tokens=500,
         do_sample=False,
-        use_split_past_cache=False,
         temperature=1,
         top_k=50,
         top_p=0.9
@@ -290,7 +287,7 @@ def main():
 
     second_split_layer_indices += llm_config.num_decoder_layers
 
-    log_dir = f'log/230824_044436'
+    log_dir = f'log/230829_124652'
     infer_finetuned_model_from_non_finetuned_feature_vector(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, log_dir)
 
 

@@ -33,7 +33,6 @@ def main(
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
-            use_split_past_cache=False,
             temperature=temperature,
             top_k=top_k,
             top_p=top_p
@@ -142,13 +141,13 @@ def main(
         simplified_generation_config = SimplifiedGenerationConfig(
             max_new_tokens=500,
             do_sample=False,
-            use_split_past_cache=False,
             temperature=1,
             top_k=50,
             top_p=0.9
         )
 
         message = 'What is the difference between AI, ML and DL?' # input('Input text : ')
+        message = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
         for response in infer_each_request(message, None, **asdict(simplified_generation_config)):
             print(response)
 
@@ -187,9 +186,13 @@ if __name__ == '__main__':
         'lmsys/vicuna-7b-v1.5',
         'lmsys/vicuna-13b-v1.5'
     ]
+    base_model_list_elyza = [
+        'elyza/ELYZA-japanese-Llama-2-7b-instruct',
+        'elyza/ELYZA-japanese-Llama-2-7b-fast-instruct'
+    ]
 
     llm_config = LlmConfig(
-        base_model=base_model_list_llama2[0],
+        base_model=base_model_list_elyza[1],
         lora_weights=None
     )
     # llm_config = LlmConfig(
@@ -206,6 +209,7 @@ if __name__ == '__main__':
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
         use_split_sent_cache=True,
+        use_past_key_values=False,
     )
 
     # Cloud での SplitComputingConfig
@@ -215,6 +219,7 @@ if __name__ == '__main__':
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
         use_split_sent_cache=True,
+        use_past_key_values=False,
     )
 
     main(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, False)

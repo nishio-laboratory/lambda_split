@@ -17,6 +17,7 @@ class SplitComputingConfig(object):
     second_split_layer_indices: list
     random_seed: int = 42
     use_split_sent_cache: bool = True
+    use_past_key_values: bool = False
     do_shuffle: bool = False
     past_dropout_rate: float = 0.0
     is_max_first_less_than_min_second: bool = True
@@ -33,6 +34,9 @@ class SplitComputingConfig(object):
         if self.wait_latency:
             assert self.measure_tensor_size_method is not None
             assert self.bandwidth is not None
+
+        if self.use_past_key_values and (len(self.first_split_layer_indices) > 1 or len(self.second_split_layer_indices) > 1):
+            raise NotImplementedError
 
 
 @dataclass
@@ -65,16 +69,11 @@ class SimplifiedGenerationConfig(object):
 
     # Parameters that control the generation strategy used
     do_sample: bool = True
-    use_split_past_cache: bool = False
 
     # Parameters for manipulation of the model output logits
     temperature: float = 1.0
     top_k: int = 50
     top_p: float = 0.9
-
-    def __post_init__(self):
-        if self.use_split_past_cache:
-            raise NotImplementedError
 
 
 class SplitComputingLogger(object):

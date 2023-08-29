@@ -6,7 +6,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
-from transformers import LlamaTokenizer, LlamaForCausalLM
+from transformers import LlamaTokenizer, LlamaForCausalLM, AutoTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from src.base import Base
@@ -23,7 +23,7 @@ class Edge(Base):
         super().__init__(split_computing_config, llm_config)
 
         self.split_computing_config = split_computing_config
-        self.tokenizer = LlamaTokenizer.from_pretrained(llm_config.base_model)
+        self.tokenizer = AutoTokenizer.from_pretrained(llm_config.base_model)
         self.tokenizer.pad_token_id = 0 # unk
 
         # あらかじめ考えられる中で最大のモデルだけを保存しておくことで、メモリを節約する
@@ -44,6 +44,8 @@ class Edge(Base):
             self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.llm_config.num_decoder_layers + 1)]
             for split_layer_index in self.second_split_layer_indices:
                 self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.llm_config.num_embed_dims), dtype=torch.half).to(self.device)
+
+        self.past_key_values = None
 
     def _get_largest_first_model(self) -> None:
         first_model = self.load_model(position='first')
@@ -80,6 +82,20 @@ class Edge(Base):
         self.free_memory()
         
         return third_model
+    
+    def _update_past_key_values(self) -> None:
+        del self.past_key_values
+        self.past_key_values = ()
+
+        for idx in range(self.llm_config.num_decoder_layers):
+            if self.first_next_cache[idx] is not None and self.third_next_cache[idx] is not None:
+                raise ValueError('first_next_cache and third_next_cache are both not None')
+            elif self.first_next_cache[idx] is not None:
+                self.past_key_values += (self.first_next_cache[idx],)
+            elif self.third_next_cache[idx] is not None:
+                self.past_key_values += (self.third_next_cache[idx],)
+            else:
+                self.past_key_values += (None,)
 
     def infer_first_model(
             self, 
@@ -92,10 +108,16 @@ class Edge(Base):
 
         # first_model の推論
         with torch.no_grad():
-            first_feature_vector = self.first_model(
+            first_model_output = self.first_model(
                 input_ids=input_ids,
-                first_split_layer_index=first_split_layer_index
+                first_split_layer_index=first_split_layer_index,
+                use_cache=self.split_computing_config.use_past_key_values,
+                past_key_values=self.past_key_values
             )
+            first_feature_vector = first_model_output.last_hidden_state
+            
+            if self.split_computing_config.use_past_key_values:
+                self.first_next_cache = first_model_output.past_key_values
 
         if self.split_computing_config.use_split_sent_cache:
             # すでに送信した past_index を削除する
@@ -169,12 +191,18 @@ class Edge(Base):
             second_feature_vector = second_feature_vector_for_send
 
         with torch.no_grad():
-            output = self.third_model(
+            third_model_output = self.third_model(
                 inputs_embeds=second_feature_vector, 
-                second_split_layer_index=second_split_layer_index
+                second_split_layer_index=second_split_layer_index,
+                use_cache=self.split_computing_config.use_past_key_values,
+                past_key_values=self.past_key_values
             )
 
-        return output
+            if self.split_computing_config.use_past_key_values:
+                self.third_next_cache = third_model_output.past_key_values
+                self._update_past_key_values()
+
+        return third_model_output
 
     # ロジットから次のトークンを選択する
     def sample_next_token(
