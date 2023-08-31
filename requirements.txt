@@ -11,3 +11,7 @@ uvicorn
 auto-gptq
 accelerate
 optimum
+tiktoken
+diffusers
+seaborn
+einops
