@@ -1,9 +1,61 @@
 from typing import Union, List, Optional, Callable, Dict, Any, Tuple
 from copy import deepcopy
 
-from diffusers import StableDiffusionXLPipeline
+from diffusers import StableDiffusionXLPipeline, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import StableDiffusionXLPipelineOutput, rescale_noise_cfg
+from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
 import torch
+
+
+import random
+import numpy as np
+import torch
+
+def torch_fix_seed(seed=42):
+    # Python random
+    random.seed(seed)
+    # Numpy
+    np.random.seed(seed)
+    # Pytorch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms = True
+
+
+torch_fix_seed()
+
+
+def quantize(tensor, num_bits=8):
+    """
+    量子化関数
+    tensor: 入力テンソル
+    num_bits: 量子化ビット数（デフォルトは8ビット）
+    """
+    min_val = tensor.min()
+    max_val = tensor.max()
+    
+    # スケールとゼロポイントを計算
+    scale = (max_val - min_val) / (2 ** num_bits - 1)
+    zero_point = min_val
+    
+    # 量子化
+    quantized_tensor = torch.round((tensor - zero_point) / scale).to(torch.int8)
+    
+    return quantized_tensor, scale, zero_point
+
+def dequantize(quantized_tensor, scale, zero_point):
+    """
+    逆量子化関数
+    quantized_tensor: 量子化されたテンソル
+    scale: スケール
+    zero_point: ゼロポイント
+    """
+    # 逆量子化
+    dequantized_tensor = (quantized_tensor.float() * scale) + zero_point
+    
+    return dequantized_tensor
+
 
 class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
     @torch.no_grad()
@@ -221,6 +273,11 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
             lora_scale=text_encoder_lora_scale,
         )
 
+        print('prompt_embeds', prompt_embeds.detach().cpu().numpy().shape)
+        print('negative_prompt_embeds', negative_prompt_embeds.detach().cpu().numpy().shape)
+        print('pooled_prompt_embeds', pooled_prompt_embeds.detach().cpu().numpy().shape)
+        print('negative_pooled_prompt_embeds', negative_pooled_prompt_embeds.detach().cpu().numpy().shape)
+
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps, device=device)
 
@@ -266,6 +323,10 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
         add_text_embeds = add_text_embeds.to(device)
         add_time_ids = add_time_ids.to(device).repeat(batch_size * num_images_per_prompt, 1)
 
+        print('prompt_embeds', prompt_embeds.detach().cpu().numpy().shape)
+        print('add_text_embeds', add_text_embeds.detach().cpu().numpy().shape)
+        print('add_time_ids', add_time_ids.detach().cpu().numpy().shape)
+
         # 8. Denoising loop
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
 
@@ -280,8 +341,10 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
             num_inference_steps = len(list(filter(lambda ts: ts >= discrete_timestep_cutoff, timesteps)))
             timesteps = timesteps[:num_inference_steps]
 
+        print(timesteps)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
+                print(i, t, latents.shape)
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
 
@@ -297,6 +360,8 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
                     added_cond_kwargs=added_cond_kwargs,
                     return_dict=False,
                 )[0]
+
+                print('noise_pred', noise_pred.shape)
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -314,7 +379,90 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
                 image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]
                 image = self.image_processor.postprocess(image, output_type=output_type)
                 image = StableDiffusionXLPipelineOutput(images=image).images[0]
-                image.save(f"generated_images/{i}.png")
+                image.save(f"generated_images_thresholding/{i}.png")
+
+                flattened = latents.flatten().detach().cpu().numpy()
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots()
+                ax.hist(flattened, bins=50, color='blue', edgecolor='black')
+                fig.tight_layout()
+                fig.savefig(f"latents_hist/{i}.png")
+
+                # 3. シャピロ・ウィルクテスト
+                import scipy.stats as stats
+                shapiro_test_stat, shapiro_p_value = stats.shapiro(flattened)
+                print(f"Shapiro-Wilk Test P-Value: {shapiro_p_value}")
+
+                # 4. コルモゴロフ-スミルノフテスト
+                ks_test_stat, ks_p_value = stats.kstest(flattened, 'norm')
+                print(f"Kolmogorov-Smirnov Test P-Value: {ks_p_value}")
+
+                print(max(latents.flatten()), min(latents.flatten()))
+                print(latents.dtype)
+
+                # ベクトルに含まれる値のf%点を求める
+                flattened = sorted(flattened)
+                f = 0.375
+                a = flattened[int(len(flattened) * f)]
+                f = 0.625
+                b = flattened[int(len(flattened) * f)]
+
+                if False:#i == 1 or i == 48:
+                    # # テンソルを量子化
+                    # quantized_tensor, scale, zero_point = quantize(latents, num_bits=8)
+                    # quantized_tensor = quantized_tensor.to(torch.int8)
+
+                    # # 量子化されたテンソルを元に戻す
+                    # quantized_tensor = quantized_tensor.to(latents.dtype)
+                    # latents = dequantize(quantized_tensor, scale, zero_point)
+
+                    # zip形式で保存
+                    torch.save(latents, f"latents/{i}.pt")
+
+                    # numpy形式で保存
+                    np.savez_compressed(f"latents/{i}.npz", latents=latents.detach().cpu().numpy())
+
+                    # float16に変換
+                    quantized_tensor = latents.to(torch.float16)
+
+                    # [a, b]の範囲の値を0にする
+                    quantized_tensor = torch.where((quantized_tensor >= a) & (quantized_tensor <= b), torch.zeros_like(quantized_tensor), quantized_tensor)
+
+                    # zip形式で保存
+                    torch.save(quantized_tensor, f"latents/{i}_thresholded.pt")
+
+                    # numpy形式で保存
+                    np.savez_compressed(f"latents/{i}_thresholded.npz", latents=quantized_tensor.detach().cpu().numpy())
+
+                    latents = quantized_tensor.to(latents.dtype)
+
+
+
+                # latentsはRGBA画像なので、RGB画像に変換してPNG保存
+                img = latents[0].detach().cpu().numpy()
+                img = np.transpose(img, (1, 2, 0))
+                img = img[:, :, :3]
+                img = (img - img.min()) / (img.max() - img.min())
+                img = (img * 255).astype(np.uint8)
+                import cv2
+                cv2.imwrite(f"latents/{i}.png", img)
+
+                img = noise_pred[0].detach().cpu().numpy()
+                img = np.transpose(img, (1, 2, 0))
+                img = img[:, :, :3]
+                img = (img - img.min()) / (img.max() - img.min())
+                img = (img * 255).astype(np.uint8)
+                import cv2
+                cv2.imwrite(f"latents/noise_pred_{i}.png", img)
+
+                flattened = noise_pred[0].flatten().detach().cpu().numpy()
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots()
+                ax.hist(flattened, bins=50, color='blue', edgecolor='black')
+                fig.tight_layout()
+                fig.savefig(f"latents_hist/noise_pred_{i}.png")
+
+
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
@@ -350,7 +498,9 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
 
 pipe = StableDiffusionXLPipelineWithHistory.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", use_safetensors=True)
 # pipe = StableDiffusionXLPipelineWithHistory.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, use_safetensors=True, variant="fp16")
-pipe.to("cuda")
+# pipe.to("cuda")
+
+print(pipe.unet.config.in_channels)
 
 # if using torch < 2.0
 # pipe.enable_xformers_memory_efficient_attention()

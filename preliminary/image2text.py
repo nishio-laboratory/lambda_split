@@ -1,5 +1,5 @@
 import torch
-from transformers import LlamaTokenizer, AutoModelForVision2Seq, BlipImageProcessor
+from transformers import LlamaTokenizer, AutoModelForVision2Seq, BlipImageProcessor, InstructBlipQFormerModel
 from PIL import Image
 import requests
 
