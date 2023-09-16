@@ -350,6 +350,11 @@ class StableDiffusionXLPipelineWithHistory(StableDiffusionXLPipeline):
 
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
+                print(latent_model_input.shape)
+                print(t)
+                print(prompt_embeds.shape)
+                print(cross_attention_kwargs)
+
                 # predict the noise residual
                 added_cond_kwargs = {"text_embeds": add_text_embeds, "time_ids": add_time_ids}
                 noise_pred = self.unet(

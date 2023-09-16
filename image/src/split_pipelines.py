@@ -171,14 +171,19 @@ class EdgeStableDiffusionXLPipeline(StableDiffusionXLPipeline):
         self.return_dict = return_dict
 
 
-        return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds, latents
+        return prompt_embeds, add_text_embeds, add_time_ids, latents
     
     @torch.no_grad()
-    def infer_third_pipeline(self, i, noise_pred):
+    def infer_third_pipeline(self, i, noise_pred, decode_image):
+        device = self._execution_device
+        noise_pred = noise_pred.to(device)
         t = self.timesteps[i]
 
         # compute the previous noisy sample x_t -> x_t-1
         self.latents = self.scheduler.step(noise_pred, t, self.latents, **self.extra_step_kwargs, return_dict=False)[0]
+
+        if not decode_image:
+            return self.image
 
         # make sure the VAE is in float32 mode, as it overflows in float16
         if self.vae.dtype == torch.float16 and self.vae.config.force_upcast:
@@ -204,8 +209,10 @@ class EdgeStableDiffusionXLPipeline(StableDiffusionXLPipeline):
 
         if not self.return_dict:
             return (image,)
+        
+        self.image = image[0]
 
-        return image[0]
+        return self.image
 
 
 
@@ -214,9 +221,8 @@ class CloudStableDiffusionXLPipeline(StableDiffusionXLPipeline):
     def receive_hidden_layer_outputs_and_prepare_for_denoising(
         self,
         prompt_embeds: torch.FloatTensor,
-        negative_prompt_embeds: torch.FloatTensor,
-        pooled_prompt_embeds: torch.FloatTensor,
-        negative_pooled_prompt_embeds: torch.FloatTensor,
+        add_text_embeds: torch.FloatTensor,
+        add_time_ids: torch.LongTensor,
         latents: torch.FloatTensor,
         height: Optional[int] = None,
         width: Optional[int] = None,
@@ -244,7 +250,12 @@ class CloudStableDiffusionXLPipeline(StableDiffusionXLPipeline):
         target_size = target_size or (height, width)
 
         # 2. Define call parameters
-        batch_size = prompt_embeds.shape[0]
+        # if prompt is not None and isinstance(prompt, str):
+        #     batch_size = 1
+        # elif prompt is not None and isinstance(prompt, list):
+        #     batch_size = len(prompt)
+        # else:
+        #     batch_size = prompt_embeds.shape[0]
 
         device = self._execution_device
 
@@ -275,19 +286,20 @@ class CloudStableDiffusionXLPipeline(StableDiffusionXLPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         # 7. Prepare added time ids & embeddings
-        add_text_embeds = pooled_prompt_embeds
-        add_time_ids = self._get_add_time_ids(
-            original_size, crops_coords_top_left, target_size, dtype=prompt_embeds.dtype
-        )
+        # add_text_embeds = pooled_prompt_embeds
+        # add_time_ids = self._get_add_time_ids(
+        #     original_size, crops_coords_top_left, target_size, dtype=prompt_embeds.dtype
+        # )
 
-        if do_classifier_free_guidance:
-            prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
-            add_text_embeds = torch.cat([negative_pooled_prompt_embeds, add_text_embeds], dim=0)
-            add_time_ids = torch.cat([add_time_ids, add_time_ids], dim=0)
+        # if do_classifier_free_guidance:
+        #     prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
+        #     add_text_embeds = torch.cat([negative_pooled_prompt_embeds, add_text_embeds], dim=0)
+        #     add_time_ids = torch.cat([add_time_ids, add_time_ids], dim=0)
 
         prompt_embeds = prompt_embeds.to(device)
         add_text_embeds = add_text_embeds.to(device)
-        add_time_ids = add_time_ids.to(device).repeat(batch_size * num_images_per_prompt, 1)
+        add_time_ids = add_time_ids.to(device) # .repeat(batch_size * num_images_per_prompt, 1)
+        latents = latents.to(device)
 
         # 8. Denoising loop
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
