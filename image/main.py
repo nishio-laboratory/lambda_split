@@ -1,11 +1,14 @@
 import random
 import time
+import gc
 
 import numpy as np
 import torch
 from tqdm import tqdm
 import gradio as gr
-from dataclasses import asdict
+from PIL import Image
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from src.split_pipelines import EdgeStableDiffusionXLPipeline, CloudStableDiffusionXLPipeline
 
@@ -29,6 +32,8 @@ def main(
 
     def infer_each_request(prompt, num_inference_steps, random_seed, freq):
         torch_fix_seed(round(random_seed))
+        torch.cuda.empty_cache()
+        gc.collect()
 
         # Triadic split computing : edge -> cloud -> edge
         inference_start_time = time.perf_counter()
@@ -53,7 +58,25 @@ def main(
             predicted_noise = cloud.infer_second_pipeline(idx)
             second_model_inference_time = time.perf_counter()
             print(f"Second model inference time : {second_model_inference_time - inference_start_time}")
+            print(f'Predicted noise shape : {predicted_noise.shape}')
+
+            predicted_noise_npy = predicted_noise[0].detach().cpu().numpy().transpose(1, 2, 0)
+
+            predicted_noise_pil = []
+            for i in range(4):
+                predicted_noise_pil.append(predicted_noise_npy[:, :, i])
+                if i < 3:
+                    # 3ピクセルの間隔を追加。形状を(128, 128)に合わせる
+                    predicted_noise_pil.append(np.zeros((predicted_noise_npy.shape[0], 3)))
+
+            predicted_noise_pil = np.hstack(predicted_noise_pil)
+
+            # 2値化
+            predicted_noise_pil = np.where(predicted_noise_pil > 0, 255, 0).astype(np.uint8)
             
+            print(f'Predicted noise pil shape : {predicted_noise_pil.shape}')
+            predicted_noise_pil = Image.fromarray(predicted_noise_pil, mode='L')
+
             ## Third pipeline on edge
             decode_image = True if idx % freq == 0 or idx == num_inference_steps - 1 else False
             image = edge.infer_third_pipeline(idx, predicted_noise, decode_image)
@@ -68,7 +91,7 @@ def main(
             elif next_decode_image:
                 yield_str += '  (Decoding image...)'
 
-            yield yield_str, image
+            yield yield_str, predicted_noise_pil, image
 
 
     if show_ui:
@@ -95,11 +118,21 @@ def main(
         freq = gr.Slider(value=10, minimum=1, maximum=50, step=1, label="Generated image update frequency (step)")
 
         current_step = gr.Textbox(label="Current generation step")
+        predicted_noise = gr.Image(type="pil", label="Binarized image of transmission data (Latent vector of predicted noise, shape = (1, 4, 128, 128))")
         image = gr.Image(type="pil", label="Generated image")
+
+        examples = [
+            ["A robot painted as graffiti on a brick wall. a sidewalk is in front of the wall, and grass is growing out of cracks in the concrete."],
+            ["Panda mad scientist mixing sparkling chemicals, artstation."],
+            ["A close-up of a fire spitting dragon, cinematic shot."],
+            ["A capybara made of lego sitting in a realistic, natural field."],
+            ["Epic long distance cityscape photo of New York City flooded by the ocean and overgrown buildings and jungle ruins in rainforest, at sunset, cinematic shot, highly detailed, 8k, golden light"]
+        ]
 
         demo = gr.Interface(infer_each_request, 
                             inputs=[prompt, num_inference_steps, random_seed, freq], 
-                            outputs=[current_step, image],
+                            examples=examples,
+                            outputs=[current_step, predicted_noise, image],
                             title="Demo : Triadic Split Computing for Stable Diffusion XL"
                             )
 
