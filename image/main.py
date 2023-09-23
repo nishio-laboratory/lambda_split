@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from src.split_pipelines import EdgeStableDiffusionXLPipeline, CloudStableDiffusionXLPipeline
+from src.custom_float import BasicCustomFloat, OptimizedCustomFloat
 
 
 def main(
@@ -61,6 +62,10 @@ def main(
             print(f'Predicted noise shape : {predicted_noise.shape}')
 
             predicted_noise_npy = predicted_noise[0].detach().cpu().numpy().transpose(1, 2, 0)
+
+            custom_float = BasicCustomFloat(4, 3, True)
+            predicted_noise_npy_bytes = custom_float.quantize_ndarray(predicted_noise_npy)
+            predicted_noise_npy = custom_float.dequantize_ndarray(predicted_noise_npy_bytes, predicted_noise_npy.shape)
 
             predicted_noise_pil = []
             for i in range(4):
@@ -129,14 +134,15 @@ def main(
             ["Epic long distance cityscape photo of New York City flooded by the ocean and overgrown buildings and jungle ruins in rainforest, at sunset, cinematic shot, highly detailed, 8k, golden light"]
         ]
 
-        demo = gr.Interface(infer_each_request, 
-                            inputs=[prompt, num_inference_steps, random_seed, freq], 
-                            examples=examples,
-                            outputs=[current_step, predicted_noise, image],
-                            title="Demo : Triadic Split Computing for Stable Diffusion XL"
-                            )
+        demo = gr.Interface(
+            infer_each_request, 
+            inputs=[prompt, num_inference_steps, random_seed, freq], 
+            examples=examples,
+            outputs=[current_step, predicted_noise, image],
+            title="Demo : Triadic Split Computing for Stable Diffusion XL"
+        )
 
-        demo.queue().launch()
+        demo.queue().launch(share=True)
         # demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
 
     else:
