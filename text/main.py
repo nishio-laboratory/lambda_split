@@ -147,7 +147,7 @@ def main(
         )
 
         message = 'What is the difference between AI, ML and DL?' # input('Input text : ')
-        message = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
+        # message = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
         for response in infer_each_request(message, None, **asdict(simplified_generation_config)):
             print(response)
 
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    n = 12
+    n = 1
     first_split_layer_indices = np.array([n])
     second_split_layer_indices = np.array([-n])
     random_seed = 42
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     ]
 
     llm_config = LlmConfig(
-        base_model=base_model_list_elyza[1],
+        base_model=base_model_list_llama2[1],
         lora_weights=None
     )
     # llm_config = LlmConfig(
@@ -204,7 +204,7 @@ if __name__ == '__main__':
 
     # Edge での SplitComputingConfig
     edge_split_computing_config = SplitComputingConfig(
-        device='cuda',
+        device='cpu',
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
