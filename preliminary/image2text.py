@@ -24,6 +24,8 @@ tokenizer = LlamaTokenizer.from_pretrained("novelai/nerdstash-tokenizer-v1", add
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
 
+print(model)
+
 # prepare inputs
 url = "https://images.unsplash.com/photo-1582538885592-e70a5d7ab3d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80"
 image = Image.open(requests.get(url, stream=True).raw).convert("RGB")
