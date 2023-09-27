@@ -174,17 +174,16 @@ class EdgeStableDiffusionXLPipeline(StableDiffusionXLPipeline):
         return prompt_embeds, add_text_embeds, add_time_ids, latents
     
     @torch.no_grad()
-    def infer_third_pipeline(self, i, noise_pred, decode_image):
+    def infer_third_pipeline(self, i, noise_pred):
         device = self._execution_device
         noise_pred = noise_pred.to(device)
         t = self.timesteps[i]
 
         # compute the previous noisy sample x_t -> x_t-1
         self.latents = self.scheduler.step(noise_pred, t, self.latents, **self.extra_step_kwargs, return_dict=False)[0]
-
-        if not decode_image:
-            return self.image
-
+        
+    @torch.no_grad()
+    def decode_image(self):
         # make sure the VAE is in float32 mode, as it overflows in float16
         if self.vae.dtype == torch.float16 and self.vae.config.force_upcast:
             self.upcast_vae()

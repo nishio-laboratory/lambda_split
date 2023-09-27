@@ -26,8 +26,8 @@ class SplitComputingConfig(object):
     bandwidth: int = None
     dropout_rate: float = 1.0
     quantize_method: str = None
-    measure_tensor_size_method: bool = 'numpy_save'
-    save_hidden_states_to_file: bool = True
+    measure_tensor_size_method: bool = False # 'numpy_save'
+    save_hidden_states_to_file: bool = False
     export_split_model_torchinfo_summary: bool = True
 
     def __post_init__(self):
@@ -76,7 +76,7 @@ class SimplifiedGenerationConfig(object):
     top_p: float = 0.9
 
 
-class SplitComputingLogger(object):
+class SplitComputingLoggerForLlm(object):
     def __init__(
             self,
             edge_split_computing_config: SplitComputingConfig,
@@ -168,6 +168,7 @@ class SplitComputingLogger(object):
 
     def save_result_to_file(
             self,
+            input_text: str,
             output_ids: torch.Tensor,
             output_text: str,
         ) -> None:
@@ -198,6 +199,7 @@ class SplitComputingLogger(object):
             print(self.llm_config, file=f)
             print(self.simplified_generation_config, file=f)
             print(file=f)
+            print('Number of input tokens :', output_ids.shape[1] - self.num_generated_tokens, file=f)
             print('Number of generated tokens :', self.num_generated_tokens, file=f)
             print('Total inference time :', total_time, '(s)', file=f)
             print('Tokens per second :', self.num_generated_tokens / total_time, '(tps)', file=f)
@@ -218,7 +220,10 @@ class SplitComputingLogger(object):
             print('Token sampling time history :', self.token_sampling_time_history, file=f)
             print('Total inference time history :', self.total_inference_time_history, file=f)
             print(file=f)
-            print('Prompt :', file=f)
+            print('Input text :', file=f)
+            print(input_text, file=f)
+            print(file=f)
+            print('Output text :', file=f)
             print(output_text, file=f)
 
     def wait_communication_latency(self):
@@ -328,51 +333,3 @@ class SplitComputingLogger(object):
                 )))
             except Exception as e:
                 f.write(repr(e))
-
-
-class Prompter(object):
-    """
-    The original program was provided on the following page.
-    https://github.com/tloen/alpaca-lora/blob/main/utils/prompter.py
-    https://github.com/tloen/alpaca-lora/blob/main/templates/alpaca.json
-    """
-    __slots__ = ("template", "_verbose")
-
-    def __init__(self, template_name: str = "", verbose: bool = False):
-        self._verbose = verbose
-        self.template = {
-            "description": "Template used by Alpaca-LoRA.",
-            "prompt_input": "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n",
-            "prompt_no_input": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n### Response:\n",
-            "response_split": "### Response:"    
-        }
-
-        if self._verbose:
-            print(
-                f"Using prompt template {template_name}: {self.template['description']}"
-            )
-
-    def generate_prompt(
-        self,
-        instruction: str,
-        input: Union[None, str] = None,
-        label: Union[None, str] = None,
-    ) -> str:
-        # returns the full prompt from instruction and optional input
-        # if a label (=response, =output) is provided, it's also appended.
-        if input:
-            res = self.template["prompt_input"].format(
-                instruction=instruction, input=input
-            )
-        else:
-            res = self.template["prompt_no_input"].format(
-                instruction=instruction
-            )
-        if label:
-            res = f"{res}{label}"
-        if self._verbose:
-            print(res)
-        return res
-
-    def get_response(self, output: str) -> str:
-        return output.split(self.template["response_split"])[1].strip().rstrip('</s>')

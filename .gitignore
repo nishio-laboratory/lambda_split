@@ -166,3 +166,4 @@ log/
 *.png
 *.npz
 *.pt
+*.pcap

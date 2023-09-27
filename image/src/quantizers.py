@@ -3,8 +3,66 @@ from tqdm import tqdm
 import io
 import gzip
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-class CustomFloat:
+
+class AffineQuantizer:
+    def __init__(self, bit) -> None:
+        self.b = bit
+
+    def clip(self, x, l, u):
+        if x < l:
+            return l
+        elif l <= x <= u:
+            return x
+        else:
+            return u
+
+    def quantize_ndarray(self, ndarray):
+        beta = ndarray.flatten().min()
+        alpha = ndarray.flatten().max()
+
+        self.s = (2 ** self.b - 1) / (alpha - beta)
+        self.z = -round(beta * self.s) - 2 ** (self.b - 1)
+
+        quantized_ndarray = [self.clip(round(self.s * x + self.z), -2 ** (self.b - 1), 2 ** (self.b - 1) - 1) for x in ndarray.flatten()]
+        quantized_ndarray = np.array(quantized_ndarray).reshape(ndarray.shape)
+
+        return quantized_ndarray
+    
+    def dequantize_ndarray(self, quantized_ndarray):
+        dequantized_ndarray = (quantized_ndarray - self.z) / self.s
+
+        return dequantized_ndarray
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(bit={self.b})'
+
+
+class CustomUnsignedIntQuantizer:
+    def __init__(self, bit) -> None:
+        self.bit = bit
+        self.scale = 2 ** bit - 1
+
+    def quantize_ndarray(self, ndarray):
+        self.min_val = ndarray.flatten().min()
+        self.max_val = ndarray.flatten().max()
+
+        quantized_ndarray = np.round((ndarray - self.min_val) / (self.max_val - self.min_val) * self.scale)
+
+        return quantized_ndarray
+
+    def dequantize_ndarray(self, quantized_ndarray):
+        dequantize_ndarray = quantized_ndarray.astype(np.float32) / self.scale * (self.max_val - self.min_val) + self.min_val
+
+        return dequantize_ndarray
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(bit={self.bit})'
+
+
+class CustomFloatQuantizer:
     def __init__(self, exponent_bits=4, mantissa_bits=3, do_zip_compression=False):
         self.exponent_bits = exponent_bits
         self.mantissa_bits = mantissa_bits
@@ -29,9 +87,12 @@ class CustomFloat:
             decompressed_data = f.read()
 
         return decompressed_data
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(exponent_bits={self.exponent_bits}, mantissa_bits={self.mantissa_bits})'
 
 
-class BasicCustomFloat(CustomFloat):
+class BasicCustomFloatQuantizer(CustomFloatQuantizer):
     '''
     q-bit 量子化で、q % 8 != 0 の場合、バイト数が切り上げになる
     Optimizedより高速
@@ -102,7 +163,7 @@ class BasicCustomFloat(CustomFloat):
         return ndarray        
 
 
-class OptimizedCustomFloat(CustomFloat):
+class OptimizedCustomFloatQuantizer(CustomFloatQuantizer):
     '''
     q-bit 量子化で、q % 8 != 0 の場合でも、バイト数が切り上げにならない
     Pythonのint型がオーバーフローしないことを利用
@@ -180,76 +241,108 @@ class OptimizedCustomFloat(CustomFloat):
 
 if __name__ == '__main__':
     # Experimenting with the optimized class
-    maes = []
-    lengths = []
-    optimized_custom_float = CustomFloat(4, 4)
+    float_exp = False
+    int_exp = True
 
-    # heatmapを作るためのコード
-    max_e = 8
-    max_m = 8
-    maes = np.zeros((max_e, max_m))
-    sizes = np.zeros((max_e, max_m))
-    zip_sizes = np.zeros((max_e, max_m))
+    if float_exp:
+        maes = []
+        lengths = []
+        optimized_custom_float = CustomFloatQuantizer(4, 4)
 
-    for e in tqdm(range(1, max_e + 1)):
-        for m in range(1, max_m + 1):
-            custom_float = OptimizedCustomFloat(e, m)
-            
-            n = 10000
-            arr = np.random.randn(n)
-            arr_bytes = custom_float.quantize_ndarray(arr)
-            arr_dequantized = custom_float.dequantize_ndarray(arr_bytes, arr.shape)
-            mae = np.abs(arr - arr_dequantized).mean()
-            maes[e - 1, m - 1] = mae
+        # heatmapを作るためのコード
+        max_e = 8
+        max_m = 8
+        maes = np.zeros((max_e, max_m))
+        sizes = np.zeros((max_e, max_m))
+        zip_sizes = np.zeros((max_e, max_m))
 
-            # 量子化後のデータのサイズを計算する
-            sizes[e - 1, m - 1] = len(arr_bytes) * 8 / n
+        for e in tqdm(range(1, max_e + 1)):
+            for m in range(1, max_m + 1):
+                custom_float = OptimizedCustomFloatQuantizer(e, m)
+                
+                n = 10000
+                arr = np.random.randn(n)
+                arr_bytes = custom_float.quantize_ndarray(arr)
+                arr_dequantized = custom_float.dequantize_ndarray(arr_bytes, arr.shape)
+                mae = np.abs(arr - arr_dequantized).mean()
+                maes[e - 1, m - 1] = mae
 
-            # ZIP圧縮を行う
-            buffer = io.BytesIO()
-            with gzip.GzipFile(fileobj=buffer, mode='wb') as f:
-                f.write(arr_bytes)
+                # 量子化後のデータのサイズを計算する
+                sizes[e - 1, m - 1] = len(arr_bytes) * 8 / n
 
-            compressed_data = buffer.getvalue()
+                # ZIP圧縮を行う
+                buffer = io.BytesIO()
+                with gzip.GzipFile(fileobj=buffer, mode='wb') as f:
+                    f.write(arr_bytes)
 
-            buffer = io.BytesIO(compressed_data)
-            with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
-                decompressed_data = f.read()
+                compressed_data = buffer.getvalue()
 
-            assert arr_bytes == decompressed_data
+                buffer = io.BytesIO(compressed_data)
+                with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
+                    decompressed_data = f.read()
 
-            zip_sizes[e - 1, m - 1] = len(compressed_data) * 8 / n
+                assert arr_bytes == decompressed_data
+
+                zip_sizes[e - 1, m - 1] = len(compressed_data) * 8 / n
 
 
+        fig, ax = plt.subplots(1, 3, figsize=(24, 8))
+        sns.heatmap(maes, annot=True, ax=ax[0])
+        sns.heatmap(sizes, annot=True, ax=ax[1])
+        sns.heatmap(zip_sizes, annot=True, ax=ax[2])
 
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+        ax[0].set_title('MAE')
+        ax[1].set_title('Size')
+        ax[2].set_title('ZIP size')
+        ax[0].set_xlabel('Mantissa bits')
+        ax[1].set_xlabel('Mantissa bits')
+        ax[2].set_xlabel('Mantissa bits')
+        ax[0].set_ylabel('Exponent bits')
+        ax[1].set_ylabel('Exponent bits')
+        ax[2].set_ylabel('Exponent bits')
 
-    fig, ax = plt.subplots(1, 3, figsize=(24, 8))
-    sns.heatmap(maes, annot=True, ax=ax[0])
-    sns.heatmap(sizes, annot=True, ax=ax[1])
-    sns.heatmap(zip_sizes, annot=True, ax=ax[2])
+        ax[0].invert_yaxis()
+        ax[1].invert_yaxis()
+        ax[2].invert_yaxis()
 
-    ax[0].set_title('MAE')
-    ax[1].set_title('Size')
-    ax[2].set_title('ZIP size')
-    ax[0].set_xlabel('Mantissa bits')
-    ax[1].set_xlabel('Mantissa bits')
-    ax[2].set_xlabel('Mantissa bits')
-    ax[0].set_ylabel('Exponent bits')
-    ax[1].set_ylabel('Exponent bits')
-    ax[2].set_ylabel('Exponent bits')
+        ax[0].set_xticklabels([str(i + 1) for i in range(max_m)])
+        ax[0].set_yticklabels([str(i + 1) for i in range(max_e)])
+        ax[1].set_xticklabels([str(i + 1) for i in range(max_m)])
+        ax[1].set_yticklabels([str(i + 1) for i in range(max_e)])
+        ax[2].set_xticklabels([str(i + 1) for i in range(max_m)])
+        ax[2].set_yticklabels([str(i + 1) for i in range(max_e)])
 
-    ax[0].invert_yaxis()
-    ax[1].invert_yaxis()
-    ax[2].invert_yaxis()
+        fig.tight_layout()
+        fig.savefig('custom_float_heatmap.png', dpi=500)
 
-    ax[0].set_xticklabels([str(i + 1) for i in range(max_m)])
-    ax[0].set_yticklabels([str(i + 1) for i in range(max_e)])
-    ax[1].set_xticklabels([str(i + 1) for i in range(max_m)])
-    ax[1].set_yticklabels([str(i + 1) for i in range(max_e)])
-    ax[2].set_xticklabels([str(i + 1) for i in range(max_m)])
-    ax[2].set_yticklabels([str(i + 1) for i in range(max_e)])
 
-    fig.tight_layout()
-    fig.savefig('custom_float_heatmap.png', dpi=500)
+    if int_exp:
+        maes = []
+        for custon_int in [AffineQuantizer, CustomUnsignedIntQuantizer]:
+            print(custon_int)
+            for b in range(1, 17):
+                n = 100000
+                arr = np.random.randn(n)
+                custom_int = custon_int(b)
+                arr_quantized = custom_int.quantize_ndarray(arr)
+                
+                arr_dequantized = custom_int.dequantize_ndarray(arr_quantized)
+                mae = np.abs(arr - arr_dequantized).mean()
+                maes.append(mae)
+
+                print(f'{b=}, {mae=}')
+                # print(arr_quantized.flatten().min(), arr_quantized.flatten().max())
+
+            print()
+
+        maes = np.array(maes).reshape(2, 16)
+
+        fig, ax = plt.subplots()
+        ax.plot(list(range(1, 17)), maes[0], label='AffineQuantizer')
+        ax.plot(list(range(1, 17)), maes[1], label='CustomInt')
+        ax.set_xlabel('Bit')
+        ax.set_ylabel('MAE')
+        ax.set_yscale('log')
+        ax.set_title('MAE of CustomInt for standard normal distribution')
+        fig.tight_layout()
+        fig.savefig('custom_int.png', dpi=500)

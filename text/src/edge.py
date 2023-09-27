@@ -43,9 +43,12 @@ class Edge(Base):
             # 過去の second_feature_vector_with_past を split_layer_index ごとに保存しておく
             self.stored_second_feature_vector_with_past_for_each_split_layer_index = [None for _ in range(self.llm_config.num_decoder_layers + 1)]
             for split_layer_index in self.second_split_layer_indices:
-                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.llm_config.num_embed_dims), dtype=torch.half).to(self.device)
+                self.stored_second_feature_vector_with_past_for_each_split_layer_index[split_layer_index] = torch.empty((1, 0, self.llm_config.num_embed_dims), dtype=self.dtype).to(self.device)
 
         self.past_key_values = None
+
+        self.free_memory()
+        self.fix_seed()
 
     def _get_largest_first_model(self) -> None:
         first_model = self.load_model(position='first')
@@ -169,7 +172,7 @@ class Edge(Base):
             self, 
             second_feature_vector_for_send: torch.Tensor
     ) -> CausalLMOutputWithPast:
-        second_feature_vector_for_send = second_feature_vector_for_send.to(self.device) #.float()
+        second_feature_vector_for_send = second_feature_vector_for_send.to(self.device).to(torch.float if self.device == 'cpu' else torch.half)
 
         second_split_layer_index = self.rng.choice(self.second_split_layer_indices)
 

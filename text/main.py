@@ -1,4 +1,5 @@
 import time
+import argparse
 
 import numpy as np
 import torch
@@ -8,14 +9,13 @@ from dataclasses import asdict
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLogger, Prompter
+from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLoggerForLlm
 
 
 def main(
         edge_split_computing_config: SplitComputingConfig,
         cloud_split_computing_config: SplitComputingConfig,
         llm_config: LlmConfig,
-        random_seed: int,
         show_ui: bool
     ):
 
@@ -24,7 +24,7 @@ def main(
     cloud = Cloud(cloud_split_computing_config, llm_config)
 
 
-    def infer_each_request(message, history, max_new_tokens, do_sample, temperature, top_k, top_p, **kwargs):
+    def infer_each_request(input_text, history, max_new_tokens, do_sample, temperature, top_k, top_p, **kwargs):
         # 毎推論時に呼び出す必要がある初期化処理
         edge.init_inference()
         cloud.init_inference()
@@ -38,15 +38,10 @@ def main(
             top_p=top_p
         )
 
-        inference_instruction = message
-        inference_input = None
-        prompter = Prompter('')
-        prompt = prompter.generate_prompt(inference_instruction, inference_input)
+        input_ids = edge.tokenizer(input_text, return_tensors="pt")["input_ids"].to(edge.device)
+        input_length = input_ids.shape[-1]
 
-        inputs = edge.tokenizer(prompt, return_tensors="pt")
-        input_ids = inputs["input_ids"].to(edge.device)
-
-        split_computing_logger = SplitComputingLogger(
+        split_computing_logger = SplitComputingLoggerForLlm(
             edge_split_computing_config, 
             cloud_split_computing_config, 
             llm_config, 
@@ -90,25 +85,22 @@ def main(
                 token_sampling_time
             )
 
-            # デトークナイズされたテキストを出力
-            output_text = edge.tokenizer.decode(output_ids[0])
-            yield_str = prompter.get_response(output_text) + '\n\n' + split_computing_logger.get_yield_str()
-            yield yield_str
-
             # EOS トークンが生成されたら終了する, それ以外の場合はinput_idsを更新する
             if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
                 break
-            else:
-                input_ids = output_ids
 
-        print(yield_str)
+            input_ids = output_ids
+
+            # デトークナイズされたテキストを出力
+            output_text = edge.tokenizer.decode(output_ids[0, input_length:]).strip()
+            yield_str = output_text + '\n\n' + split_computing_logger.get_yield_str()
+            
+            yield yield_str
+
 
         # ログを出力
-        split_computing_logger.save_result_to_file(output_ids, output_text)
+        split_computing_logger.save_result_to_file(input_text, output_ids, output_text)
         split_computing_logger.export_split_model_torchinfo_summary(edge, cloud)
-
-        edge.free_memory()
-        # cloud.free_memory()
 
 
     if show_ui:
@@ -131,7 +123,8 @@ def main(
                 with gr.Column(scale=3):
                     gr.ChatInterface(
                         fn=infer_each_request,
-                        additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p]
+                        additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p],
+                        examples=['What is the difference between AI, ML and DL?']
                     )
 
         demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
@@ -146,25 +139,59 @@ def main(
             top_p=0.9
         )
 
-        message = 'What is the difference between AI, ML and DL?' # input('Input text : ')
-        # message = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
-        for response in infer_each_request(message, None, **asdict(simplified_generation_config)):
+        input_text = 'What is the difference between AI, ML and DL?' # input('Input text : ')
+        # input_text = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
+        for response in infer_each_request(input_text, None, **asdict(simplified_generation_config)):
             print(response)
 
 
 
 if __name__ == '__main__':
+    default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--edge_device', type=str, default=default_device, help='cuda or mps or cpu')
+    parser.add_argument('--cloud_device', type=str, default=default_device, help='cuda or mps or cpu')
+    parser.add_argument('--first_split_layer', nargs='+', type=int, default=[1], help='--first_split_layer 1, or --first_split_layer 1 2 3')
+    parser.add_argument('--second_split_layer', nargs='+', type=int, default=[-1], help='--second_split_layer 31, or --second_split_layer -1')
+    parser.add_argument('-n', type=int, help='Top and bottom n layers inferred at the edge: -n 1')
+    parser.add_argument('--disable_past_caching', action='store_true', help='Disable past caching')
+    parser.add_argument('--base_model', type=str, default='meta-llama/Llama-2-7b-chat-hf', help='base model name')
+    parser.add_argument('--lora_weights', type=str, default=None, help='lora weights name')
+    parser.add_argument('--random_seed', type=int, default=42, help='random seed')
+    parser.add_argument('--no_gui', action='store_true', help='Disable Gradio GUI')
+    args = parser.parse_args()
+    print(args)
+
+    edge_device = args.edge_device
+    cloud_device = args.cloud_device
+
     # first, second = {0}, {0} or {32}, {32} or {0}, {32} の場合、decoder layersは分割されない
     # first == second の場合、2分割になる
     # first != second の場合、3分割になる
-    n = 1
-    first_split_layer_indices = np.array([n])
-    second_split_layer_indices = np.array([-n])
-    random_seed = 42
+    if args.n is not None:
+        n = args.n
+        first_split_layer_indices = np.array([n])
+        second_split_layer_indices = np.array([-n])
+    else:
+        first_split_layer_indices = np.array(args.first_split_layer)
+        second_split_layer_indices = np.array(args.second_split_layer)
+
+    # first_split_layer_indices に 負の数が存在している場合はエラー
+    if np.any(first_split_layer_indices < 0):
+        raise ValueError("There is a negative number in first_split_layer_indices.")
+    
+    # second_split_layer_indices に 正の数と負の数が混在している場合はエラー
+    if np.any(second_split_layer_indices > 0) and np.any(second_split_layer_indices < 0):
+        raise ValueError("There is a mixture of positive and negative numbers in second_split_layer_indices.")
+    
+    past_caching = not args.disable_past_caching
+    random_seed = args.random_seed
+    show_ui = not args.no_gui
 
     # LLM の Config
     ## LLaMa 2 : https://huggingface.co/meta-llama
-    base_model_list_llama2 = [ 
+    base_model_list_llama2 = [
         'meta-llama/Llama-2-7b-chat-hf',
         'meta-llama/Llama-2-13b-chat-hf',
         'meta-llama/Llama-2-70b-chat-hf',
@@ -192,34 +219,36 @@ if __name__ == '__main__':
     ]
 
     llm_config = LlmConfig(
-        base_model=base_model_list_llama2[1],
-        lora_weights=None
+        base_model=args.base_model,
+        lora_weights=args.lora_weights
     )
     # llm_config = LlmConfig(
     #     base_model=base_model_list_llama[1],
     #     lora_weights=lora_weights_list_llama[1]
     # )
 
-    second_split_layer_indices += llm_config.num_decoder_layers
+    # second_split_layer_indices が 全て0または負の数の場合は、+= llm_config.num_decoder_layers
+    if np.all(second_split_layer_indices <= 0):
+        second_split_layer_indices += llm_config.num_decoder_layers
 
     # Edge での SplitComputingConfig
     edge_split_computing_config = SplitComputingConfig(
-        device='cpu',
+        device=edge_device,
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_sent_cache=True,
+        use_split_sent_cache=past_caching,
         use_past_key_values=False,
     )
 
     # Cloud での SplitComputingConfig
     cloud_split_computing_config = SplitComputingConfig(
-        device='cuda',
+        device=cloud_device,
         first_split_layer_indices=first_split_layer_indices,
         second_split_layer_indices=second_split_layer_indices,
         random_seed=random_seed,
-        use_split_sent_cache=True,
+        use_split_sent_cache=past_caching,
         use_past_key_values=False,
     )
 
-    main(edge_split_computing_config, cloud_split_computing_config, llm_config, random_seed, False)
+    main(edge_split_computing_config, cloud_split_computing_config, llm_config, show_ui)

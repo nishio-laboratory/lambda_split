@@ -1,4 +1,5 @@
 import io
+import random
 from typing import List, Union
 import gc
 
@@ -44,8 +45,10 @@ class Base:
         self.do_replace_unused_layers_with_identity = split_computing_config.do_replace_unused_layers_with_identity
 
         self.device = split_computing_config.device
+        self.dtype = torch.float if split_computing_config.device == 'cpu' else torch.half
 
         # 乱数生成器
+        self.random_seed = self.split_computing_config.random_seed
         self.rng = np.random.default_rng(self.split_computing_config.random_seed)
 
         if "cuda" in self.device:
@@ -70,28 +73,28 @@ class Base:
         if self.device == "cuda":
             model = position_model.from_pretrained(
                 self.llm_config.base_model,
-                torch_dtype=torch.float16,
+                torch_dtype=self.dtype,
                 device_map={"": self.device},
             )
             if self.llm_config.lora_weights is not None:
                 model = PeftModel.from_pretrained(
                     model,
                     self.llm_config.lora_weights,
-                    torch_dtype=torch.float16,
+                    torch_dtype=self.dtype,
                     device_map={"": self.device}
                 )
         elif self.device == "mps":
             model = position_model.from_pretrained(
                 self.llm_config.base_model,
                 device_map={"": self.device},
-                torch_dtype=torch.float16,
+                torch_dtype=self.dtype,
             )
             if self.llm_config.lora_weights is not None:
                 model = PeftModel.from_pretrained(
                     model,
                     self.llm_config.lora_weights,
                     device_map={"": self.device},
-                    torch_dtype=torch.float16,
+                    torch_dtype=self.dtype,
                 )
         else:
             model = position_model.from_pretrained(
@@ -123,3 +126,14 @@ class Base:
     def free_memory(self):
         torch.cuda.empty_cache()
         gc.collect()
+
+    def fix_seed(self):
+        # Python random
+        random.seed(self.random_seed)
+        # Numpy
+        np.random.seed(self.random_seed)
+        # Pytorch
+        torch.manual_seed(self.random_seed)
+        torch.cuda.manual_seed(self.random_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.use_deterministic_algorithms = True

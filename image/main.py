@@ -1,6 +1,5 @@
-import random
 import time
-import gc
+import argparse
 
 import numpy as np
 import torch
@@ -11,12 +10,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from src.split_pipelines import EdgeStableDiffusionXLPipeline, CloudStableDiffusionXLPipeline
-from src.custom_float import BasicCustomFloat, OptimizedCustomFloat
+from src.quantizers import AffineQuantizer
+from src.utils import SplitComputingLoggerForLdm, fix_seed_and_free_memory
 
 
 def main(
         edge_device: str,
         cloud_device: str,
+        quantize_methods: list,
         show_ui: bool
     ):
     # Edge と Cloud の推論パイプライン
@@ -31,17 +32,18 @@ def main(
     cloud.to(cloud_device)
 
 
-    def infer_each_request(prompt, num_inference_steps, random_seed, freq):
-        torch_fix_seed(round(random_seed))
-        torch.cuda.empty_cache()
-        gc.collect()
+    def infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize):
+        fix_seed_and_free_memory(round(random_seed))
 
         # Triadic split computing : edge -> cloud -> edge
         inference_start_time = time.perf_counter()
 
-        # Edge での first_pipeline の推論
+        # Edge での first subpipeline の推論
         prompt_embeds, add_text_embeds, add_time_ids, initial_latents = \
             edge.infer_first_pipeline(prompt=prompt, num_inference_steps=num_inference_steps)
+        
+        initial_image = edge.decode_image()
+        timesteps = edge.timesteps
         
         # Cloud が first_hidden_layer_outputs を受け取って、denoising に必要な準備する
         cloud.receive_hidden_layer_outputs_and_prepare_for_denoising(
@@ -52,51 +54,103 @@ def main(
             num_inference_steps=num_inference_steps
         )
 
+        split_computing_logger = SplitComputingLoggerForLdm()
+        split_computing_logger.save_initial_data(
+            prompt,
+            prompt_embeds,
+            add_text_embeds,
+            add_time_ids,
+            initial_latents,
+            initial_image,
+            num_inference_steps,
+            timesteps
+        )
+
+        yield f'0 / {num_inference_steps} (First subpipeline inference completed)', None, initial_image
+
+        image = initial_image
+
+        # Denoising
         for idx in tqdm(range(num_inference_steps)):
             print(idx)
 
-            ## Second pipeline on cloud
+            ## Second subpipeline on cloud
             predicted_noise = cloud.infer_second_pipeline(idx)
             second_model_inference_time = time.perf_counter()
             print(f"Second model inference time : {second_model_inference_time - inference_start_time}")
             print(f'Predicted noise shape : {predicted_noise.shape}')
 
-            predicted_noise_npy = predicted_noise[0].detach().cpu().numpy().transpose(1, 2, 0)
 
-            custom_float = BasicCustomFloat(4, 3, True)
-            predicted_noise_npy_bytes = custom_float.quantize_ndarray(predicted_noise_npy)
-            predicted_noise_npy = custom_float.dequantize_ndarray(predicted_noise_npy_bytes, predicted_noise_npy.shape)
+            # 送信データの量子化
+            predicted_noise_npy = predicted_noise.detach().cpu().numpy()
 
-            predicted_noise_pil = []
-            for i in range(4):
-                predicted_noise_pil.append(predicted_noise_npy[:, :, i])
-                if i < 3:
-                    # 3ピクセルの間隔を追加。形状を(128, 128)に合わせる
-                    predicted_noise_pil.append(np.zeros((predicted_noise_npy.shape[0], 3)))
+            if quantize == 'FP32':
+                quantizer = quantize
+        
+            elif quantize == 'FP16':
+                quantizer = quantize
+                predicted_noise_npy = predicted_noise_npy.astype(np.float16)
 
-            predicted_noise_pil = np.hstack(predicted_noise_pil)
+            # elif quantize == 'FP8 (E4M3)':
+            #     quantizer = OptimizedCustomFloat(4, 5, False)
+            #     predicted_noise_npy_bytes = quantizer.quantize_ndarray(predicted_noise_npy)
+            #     predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_bytes, predicted_noise_npy.shape)
 
-            # 2値化
-            predicted_noise_pil = np.where(predicted_noise_pil > 0, 255, 0).astype(np.uint8)
+            elif 'INT' in quantize:
+                bit = int(quantize.split('INT')[1])
+                quantizer = AffineQuantizer(bit)
+                predicted_noise_npy_quantized = quantizer.quantize_ndarray(predicted_noise_npy)
+                predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_quantized)
+
+            else:
+                raise ValueError('Invalid quantize value')
+
+            predicted_noise = predicted_noise_npy.astype(np.float32)
+            predicted_noise = torch.from_numpy(predicted_noise).to(edge_device)
+
             
-            print(f'Predicted noise pil shape : {predicted_noise_pil.shape}')
-            predicted_noise_pil = Image.fromarray(predicted_noise_pil, mode='L')
+            # ノイズ画像化(RGBA)
+            predicted_noise_img = predicted_noise_npy[0].transpose(1, 2, 0)
+            # 標準正規分布は 99.7% が [-3, 3] の範囲に入る
+            threshold = 3
+            # -3より小さい値は-3に、3より大きい値は3にする
+            predicted_noise_npy[predicted_noise_npy < -threshold] = -threshold
+            predicted_noise_npy[predicted_noise_npy > threshold] = threshold
+            
+            predicted_noise_img = predicted_noise_img + threshold
+            predicted_noise_img = predicted_noise_img / (2 * threshold) * 255
+            predicted_noise_img = Image.fromarray(predicted_noise_img.astype(np.uint8), mode='RGBA')
+            
 
-            ## Third pipeline on edge
-            decode_image = True if idx % freq == 0 or idx == num_inference_steps - 1 else False
-            image = edge.infer_third_pipeline(idx, predicted_noise, decode_image)
+            # Third subpipeline on edge
+            edge.infer_third_pipeline(idx, predicted_noise)
+
+
+            # Post processing
+            idx += 1
+            decode_image = True if idx % freq == 0 or idx == num_inference_steps else False
+            if decode_image:
+                image = edge.decode_image()
 
             third_model_inference_time = time.perf_counter()
             print(f"Third model inference time : {third_model_inference_time - inference_start_time}")
             
-            next_decode_image = True if (idx + 1) % freq == 0 or idx == num_inference_steps - 2 else False
-            yield_str = f'{idx + 1} / {num_inference_steps}'
-            if idx == num_inference_steps - 1:
+            next_decode_image = True if (idx + 1) % freq == 0 or (idx + 1) == num_inference_steps else False
+            yield_str = f'{idx} / {num_inference_steps}'
+            if idx == num_inference_steps:
                 yield_str += '  (Image generation completed)'
             elif next_decode_image:
                 yield_str += '  (Decoding image...)'
 
-            yield yield_str, predicted_noise_pil, image
+            split_computing_logger.save_data(
+                idx,
+                predicted_noise_npy,
+                predicted_noise_img,
+                quantizer=quantizer,
+                decoded_image=image if decode_image else None
+            )
+
+            yield yield_str, predicted_noise_img, image
 
 
     if show_ui:
@@ -120,10 +174,11 @@ def main(
         prompt = gr.Textbox(value="An astronaut riding a green horse", label="Prompt")
         num_inference_steps = gr.Slider(value=50, minimum=1, maximum=200, step=1, label="Number of inference steps")
         random_seed = gr.Number(value=42, label="Random seed")
-        freq = gr.Slider(value=10, minimum=1, maximum=50, step=1, label="Generated image update frequency (step)")
+        freq = gr.Slider(value=10, minimum=1, maximum=50, step=1, label="Image decode frequency (step)")
+        quantize = gr.Radio(quantize_methods, label="Transmitted noise quantization method", value="FP32")
 
         current_step = gr.Textbox(label="Current generation step")
-        predicted_noise = gr.Image(type="pil", label="Binarized image of transmission data (Latent vector of predicted noise, shape = (1, 4, 128, 128))")
+        predicted_noise = gr.Image(type="pil", label="RGBA Image of transmission data (Latent vector of predicted noise, shape = (1, 4, 128, 128))")
         image = gr.Image(type="pil", label="Generated image")
 
         examples = [
@@ -136,7 +191,7 @@ def main(
 
         demo = gr.Interface(
             infer_each_request, 
-            inputs=[prompt, num_inference_steps, random_seed, freq], 
+            inputs=[prompt, num_inference_steps, random_seed, freq, quantize], 
             examples=examples,
             outputs=[current_step, predicted_noise, image],
             title="Demo : Triadic Split Computing for Stable Diffusion XL"
@@ -150,26 +205,25 @@ def main(
         num_inference_steps = 50 # int(input('Number of inference steps : '))
         random_seed = 42 # int(input('Random seed : '))
         freq = 10 # int(input('Generated image update frequency : '))
+        # quantize = quantize_methods[0]
 
-        for response in infer_each_request(prompt, num_inference_steps, random_seed, freq):
-            pass
-
-
-def torch_fix_seed(seed=42):
-    # Python random
-    random.seed(seed)
-    # Numpy
-    np.random.seed(seed)
-    # Pytorch
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms = True
+        for quantize in quantize_methods:
+            for yield_str, predicted_noise_pil, image in infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize):
+                pass
 
 
 if __name__ == '__main__':
-    edge_device = 'cpu'
-    cloud_device = 'cuda'
-    show_ui = True
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--edge_device', type=str, default='cpu', help='cuda or mps or cpu')
+    parser.add_argument('--cloud_device', type=str, default='cuda', help='cuda or mps or cpu')
+    parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "FP16", "INT8", "INT7", "INT6", "INT5", "INT4", "INT3", "INT2", "INT1"], help='Quantization methods, you can add INTn (n > 8)')
+    parser.add_argument('--no_gui', action='store_true', help='Disable Gradio GUI')
+    args = parser.parse_args()
+    print(args)
+
+    edge_device = args.edge_device
+    cloud_device = args.cloud_device
+    quantize_methods = args.quantize_methods
+    show_ui = not args.no_gui
     
-    main(edge_device, cloud_device, show_ui)
+    main(edge_device, cloud_device, quantize_methods, show_ui)

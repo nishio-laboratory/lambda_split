@@ -8,7 +8,7 @@ from dataclasses import asdict
 
 from src.cloud import Cloud
 from src.edge import Edge
-from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLogger, Prompter
+from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfig, SplitComputingLoggerForLlm
 
 
 def infer_finetuned_model_from_non_finetuned_feature_vector(
@@ -46,7 +46,7 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
         inputs = edge.tokenizer(prompt, return_tensors="pt")
         input_ids = inputs["input_ids"].to(edge.device)
 
-        split_computing_logger = SplitComputingLogger(
+        split_computing_logger = SplitComputingLoggerForLlm(
             edge_split_computing_config, 
             cloud_split_computing_config, 
             llm_config, 
@@ -138,7 +138,7 @@ def infer_finetuned_model_from_non_finetuned_feature_vector(
         inputs = edge.tokenizer(prompt, return_tensors="pt")
         input_ids = inputs["input_ids"].to(edge.device)
 
-        split_computing_logger = SplitComputingLogger(
+        split_computing_logger = SplitComputingLoggerForLlm(
             edge_split_computing_config, 
             cloud_split_computing_config, 
             llm_config, 

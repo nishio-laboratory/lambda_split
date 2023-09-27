@@ -37,6 +37,9 @@ class Cloud(Base):
 
         self.past_key_values = None
 
+        self.free_memory()
+        self.fix_seed()
+
     def _get_largest_second_model(self):
         second_model = self.load_model(position='second')
 
@@ -61,7 +64,7 @@ class Cloud(Base):
         self, 
         first_feature_vector_for_send: torch.Tensor
     ) -> torch.Tensor:
-        first_feature_vector_for_send = first_feature_vector_for_send.to(self.device).half()
+        first_feature_vector_for_send = first_feature_vector_for_send.to(self.device).to(self.dtype)
 
         ## 分割するレイヤの箇所を乱数で決める (second_split_layer_index も一度に決めてしまうと、shuffle された first_feature_vector を復元できないので、first_split_layer_index とは別に決める)
         first_split_layer_index = self.rng.choice(self.first_split_layer_indices)
