@@ -167,3 +167,4 @@ log/
 *.npz
 *.pt
 *.pcap
+*.tex

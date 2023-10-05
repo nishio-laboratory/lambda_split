@@ -241,7 +241,7 @@ class OptimizedCustomFloatQuantizer(CustomFloatQuantizer):
 
 if __name__ == '__main__':
     # Experimenting with the optimized class
-    float_exp = False
+    float_exp = True
     int_exp = True
 
     if float_exp:
@@ -315,6 +315,12 @@ if __name__ == '__main__':
         fig.tight_layout()
         fig.savefig('custom_float_heatmap.png', dpi=500)
 
+        min_val = [1 for _ in range(max_e + max_m + 2)]
+        for e in range(1, max_e + 1):
+            for m in range(1, max_m + 1):
+                min_val[e + m + 1] = min(min_val[e + m + 1], maes[e - 1, m - 1])
+                
+
 
     if int_exp:
         maes = []
@@ -338,11 +344,13 @@ if __name__ == '__main__':
         maes = np.array(maes).reshape(2, 16)
 
         fig, ax = plt.subplots()
-        ax.plot(list(range(1, 17)), maes[0], label='AffineQuantizer')
-        ax.plot(list(range(1, 17)), maes[1], label='CustomInt')
+        ax.plot(list(range(1, 17)), maes[0], label='Integer quantization')
+        ax.plot(min_val, label='Floating point quantization')
+        ax.legend()
+        ax.set_xlim([0, 16])
         ax.set_xlabel('Bit')
         ax.set_ylabel('MAE')
         ax.set_yscale('log')
-        ax.set_title('MAE of CustomInt for standard normal distribution')
+        ax.set_title('Quantization MAE for standard normal distribution')
         fig.tight_layout()
         fig.savefig('custom_int.png', dpi=500)

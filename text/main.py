@@ -4,7 +4,6 @@ import argparse
 import numpy as np
 import torch
 from tqdm import tqdm
-import gradio as gr
 from dataclasses import asdict
 
 from src.cloud import Cloud
@@ -104,6 +103,7 @@ def main(
 
 
     if show_ui:
+        import gradio as gr
         with gr.Blocks() as demo:
             if llm_config.lora_weights is None:
                 gr.Markdown(f"<h1><center>Demo : Triadic Split Computing for {llm_config.base_model}</center></h1>")
@@ -132,7 +132,7 @@ def main(
     else:
         # テキスト生成の Config
         simplified_generation_config = SimplifiedGenerationConfig(
-            max_new_tokens=500,
+            max_new_tokens=300,
             do_sample=False,
             temperature=1,
             top_k=50,

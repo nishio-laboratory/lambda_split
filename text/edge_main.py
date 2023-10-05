@@ -47,7 +47,7 @@ def edge_main(
             simplified_generation_config
         )
 
-        requests.post("http://192.168.1.222:7860/infer_cloud_init/")
+        requests.post("http://192.168.1.222:7860/infer_cloud_init/", data=split_computing_logger.save_datetime_str.encode())
 
         for idx in tqdm(range(simplified_generation_config.max_new_tokens)):
             print(idx)

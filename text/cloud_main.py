@@ -1,6 +1,8 @@
 import io
 import threading
 import argparse
+import time
+import os
 
 import numpy as np
 import torch
@@ -18,7 +20,8 @@ from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfi
 
 def cloud_main(
         cloud_split_computing_config: SplitComputingConfig,
-        llm_config: LlmConfig
+        llm_config: LlmConfig,
+        port: int
     ):
 
     # Edge と Cloud のインスタンス
@@ -29,9 +32,17 @@ def cloud_main(
 
     # 排他制御のためのロックを作成
     lock = threading.Lock()
+    save_datetime_str = None
+    second_model_inference_times = []
 
     @app.post("/infer_cloud_init/")
     def infer_init(request: Request):
+        # 時間計測用
+        global save_datetime_str
+        save_datetime_str = request.body().decode()
+        os.makedirs(f'./log/{save_datetime_str}', exist_ok=True)
+        second_model_inference_times.clear()
+
         # 毎推論時に呼び出す必要がある初期化処理
         cloud.init_inference()
 
@@ -46,13 +57,21 @@ def cloud_main(
             first_feature_vector_for_send = torch.from_numpy(first_feature_vector_for_send_numpy).to(cloud.device)
 
             ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
+            start_time = time.perf_counter()
             second_feature_vector_for_send = cloud.infer_second_model(first_feature_vector_for_send)
+            end_time = time.perf_counter()
+
+            second_model_inference_times.append(end_time - start_time)
+            np.save(f'./log/{save_datetime_str}/second_model_inference_time_cloud.npy', np.array(second_model_inference_times))
+            with open(f'./log/{save_datetime_str}/second_model_inference_time_cloud.txt', 'w') as f:
+                f.write(str(second_model_inference_times))
+
             second_feature_vector_for_send = second_feature_vector_for_send.cpu().numpy().astype(np.float16)
             
             return StreamingResponse(io.BytesIO(second_feature_vector_for_send.tobytes()), media_type="application/octet-stream")
         
 
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == '__main__':
@@ -69,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('--lora_weights', type=str, default=None, help='lora weights name')
     parser.add_argument('--random_seed', type=int, default=42, help='random seed')
     parser.add_argument('--no_gui', action='store_true', help='Disable Gradio GUI')
+    parser.add_argument('--port', type=int, default=7860, help='Port number')
     args = parser.parse_args()
     print(args)
 
@@ -150,4 +170,6 @@ if __name__ == '__main__':
         use_past_key_values=False,
     )
 
-    cloud_main(cloud_split_computing_config, llm_config)
+    port = args.port
+
+    cloud_main(cloud_split_computing_config, llm_config, port)

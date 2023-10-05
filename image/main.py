@@ -96,19 +96,21 @@ def main(
             #     predicted_noise_npy_bytes = quantizer.quantize_ndarray(predicted_noise_npy)
             #     predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_bytes, predicted_noise_npy.shape)
 
-            elif 'INT' in quantize:
-                bit = int(quantize.split('INT')[1])
+            elif 'INT' in quantize or quantize == 'BOOL':
+                if quantize == 'BOOL':
+                    bit = 1
+                else:
+                    bit = int(quantize.split('INT')[1])
                 quantizer = AffineQuantizer(bit)
                 predicted_noise_npy_quantized = quantizer.quantize_ndarray(predicted_noise_npy)
                 predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_quantized)
-
             else:
                 raise ValueError('Invalid quantize value')
 
             predicted_noise = predicted_noise_npy.astype(np.float32)
             predicted_noise = torch.from_numpy(predicted_noise).to(edge_device)
 
-            
+
             # ノイズ画像化(RGBA)
             predicted_noise_img = predicted_noise_npy[0].transpose(1, 2, 0)
             # 標準正規分布は 99.7% が [-3, 3] の範囲に入る
@@ -216,7 +218,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--edge_device', type=str, default='cpu', help='cuda or mps or cpu')
     parser.add_argument('--cloud_device', type=str, default='cuda', help='cuda or mps or cpu')
-    parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "FP16", "INT8", "INT7", "INT6", "INT5", "INT4", "INT3", "INT2", "INT1"], help='Quantization methods, you can add INTn (n > 8)')
+    parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "FP16", "INT8", "INT7", "INT6", "INT5", "INT4", "INT3", "INT2", "BOOL"], help='Quantization methods, you can add INTn (n > 8)')
     parser.add_argument('--no_gui', action='store_true', help='Disable Gradio GUI')
     args = parser.parse_args()
     print(args)
