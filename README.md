@@ -7,7 +7,9 @@ This repository provides demonstration programs that apply the Λ-Split to LLMs,
 
 ### Text generation using Llama 2
 
-https://github.com/nishio-laboratory/lambda_split/assets/63134290/2929b45b-4133-4148-af6c-d04eeac05236
+
+
+https://github.com/nishio-laboratory/lambda_split/assets/63134290/e07ce6e0-df56-48aa-981f-544b46a23d03
 
 
 
@@ -16,7 +18,8 @@ https://github.com/nishio-laboratory/lambda_split/assets/63134290/2929b45b-4133-
 
 
 
-https://github.com/nishio-laboratory/lambda_split/assets/63134290/f160ce14-2a90-4016-ad78-f0b6d880defe
+
+https://github.com/nishio-laboratory/lambda_split/assets/63134290/93832dcd-d547-4675-bbc4-498771728e61
 
 
 
