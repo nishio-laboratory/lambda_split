@@ -7,11 +7,18 @@ This repository provides demonstration programs that apply the Λ-Split to LLMs,
 
 ### Text generation using Llama 2
 
-<div><video controls src="text_generation_demo.mp4" muted="false"></video></div>
+https://github.com/nishio-laboratory/lambda_split/assets/63134290/2929b45b-4133-4148-af6c-d04eeac05236
+
+
+
 
 ### Image generation using SDXL
 
-<div><video controls src="image_generation_demo.mp4" muted="false"></video></div>
+
+
+https://github.com/nishio-laboratory/lambda_split/assets/63134290/f160ce14-2a90-4016-ad78-f0b6d880defe
+
+
 
 
 ## Usage
