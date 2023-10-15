@@ -1,43 +1,100 @@
-# Triadic Split Computing
+# Λ-Split: A Privacy-Preserving Split Computing Framework for Cloud-Powered Generative AI
 
-Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
-
-
-## 技術的要点
-
-- Triadic にすることで、通信はすべて中間層出力の特徴ベクトルで行われるため、安全性が高い
-- Transformerベースの言語モデルがDecoderを複数重ねていることを利用し、分割するレイヤを毎回変えることで、特徴ベクトル形状は同じものの、異なるレイヤの中間層出力を送っているため、復元が難しい
-- LLMはサイズが大きいので、Splitしてサイズを小さくして多くのデバイスでロード可能にする
-- (特徴ベクトルはサイズが大きいため、Int8量子化 [2] をして送信する or Dropoutする)
-- LLM実装は、MetaのOpen Source LLMであるLLaMa-2 または LLaMa を使用
-
-[1] https://speakerdeck.com/joisino/shen-ceng-moderunogao-su-hua?slide=7
+This repository provides demonstration programs that apply the Λ-Split to LLMs, including [Llama 2](https://huggingface.co/meta-llama), and diffusion models, including [Stable Diffusion XL (SDXL)](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0).
 
 
+## Videos
 
-## 具体的な分割の操作
-1. 推論時の推論レイヤを正しく分割するための、モデルのforwardメソッドのoverride（`src/models.py` の `FirstLlamaModel` などの `forward` メソッド内でコメントアウトすることで実装）
-2. メモリ使用量削減のため、不要なレイヤを Identity レイヤで置き換える（`src/models.py` の `FirstLlamaModel` などの `replace_unused_layers_with_identity` メソッドを実装）
+### Text generation using Llama 2
 
+<div><video controls src="text_generation_demo.mp4" muted="false"></video></div>
 
-## ファイルの説明
+### Image generation using SDXL
 
-- `main.py` : メインプログラム
-- `src/cloud.py` : クラウドクラス（first modelとthird modelを推論）
-- `src/edge.py` : エッジクラス（second modelを推論）
-- `src/base.py` : クラウドサーバ・エッジサーバの継承元クラス
-- `src/split_models.py` : 分割用のLLMクラスである`FirstLlamaModel`・`FirstLlamaForCausalLM`・`SecondLlamaModel`・`SecondLlamaForCausalLM`・`ThirdLlamaModel`・`ThirdLlamaForCausalLM`が定義されている
-- `src/utils.py` : 推論のためのutils
-- `torchinfo_summary_log/` : 分割したLLMの `torchinfo.summary` の結果
+<div><video controls src="image_generation_demo.mp4" muted="false"></video></div>
 
 
-## 実行方法
+## Usage
 
-`main.py` の first split layer の index の集合 `first_split_layer_indices` と second split layer の index の集合 `second_split_layer_indices` を変更して、
+Python version : 3.8 or later
 
 ```bash
+python3 -m pip install -r requirements.txt
+```
+
+### Text generation using Llama 2
+
+1. You must agree to Meta's license as stated on the [Huggingface page](https://huggingface.co/meta-llama).
+
+2. Execute the following command
+```bash
+cd text_generation
 python3 main.py
 ```
 
-初回時はPre-trainedモデルのダウンロードが必要。
-LLaMa-2 では、https://note.com/npaka/n/n79eebc29366d の3.1の利用申請と3.2の `huggingface-cli login` をする必要がある。
+
+### Text generation using Llama 2 with HTTP communication
+
+1. You must agree to Meta's license as stated on the [Huggingface page](https://huggingface.co/meta-llama).
+
+
+2. Prepare 2 computers for cloud server and local device.
+
+
+3. Execute the following command on each computer
+
+Cloud
+```bash
+cd text_generation
+python3 cloud_main.py
+```
+
+Local
+```bash
+cd text_generation
+python3 edge_main.py
+```
+
+
+### Image generation using SDXL
+
+```bash
+cd image_generation
+python3 main.py
+```
+
+
+## Directory tree
+
+```
+lambda_split/
+│
+├─ text_generation/
+│  ├─ main.py
+│  ├─ cloud_main.py : For HTTP communication
+│  ├─ edge_main.py : For HTTP communication
+│  └─ src/
+│     ├─ base.py
+│     ├─ cloud.py
+│     ├─ edge.py
+│     ├─ split_models.py : Definition of split sub-models.
+│     └─ utils.py
+│
+├─ image_generation/
+│  ├─ main.py
+│  ├─ evaluation.py
+│  └─ src/
+│     ├─ quantizers.py : For quantization
+│     ├─ split_pipelines.py : Definition of split sub-models.
+│     └─ utils.py
+│
+└─ requirements.txt
+```
+
+
+
+## Overview of split implementation
+1. override forward method of models to correctly split inference layers at inference time (implemented by commenting out in `forward` method of `FirstLlamaModel` etc. in `src/models.py`)
+2. replace unused layers with identity layers to reduce memory usage (implemented by `replace_unused_layers_with_identity` method in `src/models.py` `FirstLlamaModel` etc.)
+
+

@@ -1,4 +1,4 @@
-torch>=2.0.0
+torch==2.0.1
 transformers==4.31.0
 peft==0.4.0
 numpy>=1.18
@@ -12,7 +12,7 @@ auto-gptq
 accelerate
 optimum
 tiktoken
-diffusers
+diffusers==0.21.4
 seaborn
 einops
 scikit-image
