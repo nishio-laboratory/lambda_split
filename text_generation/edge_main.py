@@ -145,7 +145,7 @@ def edge_main(
             top_p=0.9
         )
 
-        input_text = 'What is the difference between AI, ML and DL?'
+        input_text = input('Prompt: ') # 'What is the difference between AI, ML and DL?'
         for response in infer_each_request(input_text, None, **asdict(simplified_generation_config)):
             print(response)
 
