@@ -1,17 +1,14 @@
-# Triadic Split Computing
+# Λ-Split: プライバシに配慮した生成AIサービスに向けた三分割 Split Computing フレームワーク
 
-Edge -> Cloud -> Edge で分割する3分割 (Triadic) Split Computing for LLM
+Local -> Cloud -> Local で分割する3分割 (Triadic) Split Computing for LLM
 
 
 ## 技術的要点
 
-- Triadic にすることで、通信はすべて中間層出力の特徴ベクトルで行われるため、安全性が高い
-- Transformerベースの言語モデルがDecoderを複数重ねていることを利用し、分割するレイヤを毎回変えることで、特徴ベクトル形状は同じものの、異なるレイヤの中間層出力を送っているため、復元が難しい
-- LLMはサイズが大きいので、Splitしてサイズを小さくして多くのデバイスでロード可能にする
-- (特徴ベクトルはサイズが大きいため、Int8量子化 [2] をして送信する or Dropoutする)
+- 3分割することで、通信はすべて中間層出力の特徴ベクトルで行われるため、通信の安全性が高まる
+- 生成AIモデルはサイズが大きいので、Splitしてサイズを小さくして多くのデバイスでロード可能にする
 - LLM実装は、MetaのOpen Source LLMであるLLaMa-2 または LLaMa を使用
-
-[1] https://speakerdeck.com/joisino/shen-ceng-moderunogao-su-hua?slide=7
+- Diffusion model実装には、Stable Diffusion XLを使用
 
 
 
