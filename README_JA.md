@@ -1,4 +1,4 @@
-# Λ-Split: プライバシに配慮した生成AIサービスに向けた三分割 Split Computing フレームワーク
+# Λ-Split: プライバシに配慮した生成AIサービスに向けた三分割 Split Computing フレームワーク
 
 Local -> Cloud -> Local で分割する3分割 (Triadic) Split Computing for LLM
 
