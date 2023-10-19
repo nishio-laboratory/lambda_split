@@ -107,6 +107,7 @@ def main(
         with gr.Blocks() as demo:
             if llm_config.lora_weights is None:
                 gr.Markdown(f"<h1><center>Demo : Lambda-Split for {llm_config.base_model}</center></h1>")
+                gr.Markdown(f"<p><center>GitHub: <a href=https://github.com/nishio-laboratory/lambda_split>https://github.com/nishio-laboratory/lambda_split</a></center></p>")
             else:
                 gr.Markdown(f"<h1><center>Demo : Lambda-Split for {llm_config.base_model} with {llm_config.lora_weights}</center></h1>")
 
@@ -124,10 +125,11 @@ def main(
                     gr.ChatInterface(
                         fn=infer_each_request,
                         additional_inputs=[max_new_tokens, do_sample, temperature, top_k, top_p],
-                        # examples=['What is the difference between AI, ML and DL?']
+                        examples=['What is the difference between AI, ML and DL?']
                     )
 
-        demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
+        #demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
+        demo.queue().launch(share=True)
 
     else:
         # テキスト生成の Config

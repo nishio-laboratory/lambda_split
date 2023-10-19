@@ -163,7 +163,8 @@ def main(
     if show_ui:
         with gr.Blocks() as demo:
             gr.Markdown(f"<h1><center>Demo : Lambda-Split for stabilityai/stable-diffusion-xl-base-1.0</center></h1>")
-
+            gr.Markdown(f"<p><center>GitHub: <a href=https://github.com/nishio-laboratory/lambda_split>https://github.com/nishio-laboratory/lambda_split</a></center></p>")
+            
             with gr.Row():
                 with gr.Column(scale=1):
                     gr.Markdown(f"<center>Image Generation Config</center>")
@@ -212,8 +213,8 @@ def main(
         #     title="Demo : Lambda-Split for stabilityai/stable-diffusion-xl-base-1.0"
         # )
 
-        # demo.queue().launch(share=True)
-        demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
+        demo.queue().launch(share=True)
+        # demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
 
     else:
         prompt = 'An astronaut riding a green horse' # input('Prompt : ')
