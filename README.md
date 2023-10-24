@@ -1,5 +1,7 @@
 # Λ-Split: A Privacy-Preserving Split Computing Framework for Cloud-Powered Generative AI
 
+Preprint URL : https://arxiv.org/abs/2310.14651
+
 This repository provides demonstration programs that apply the Λ-Split to LLMs, including [Llama 2](https://huggingface.co/meta-llama), and diffusion models, including [Stable Diffusion XL (SDXL)](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0).
 
 
