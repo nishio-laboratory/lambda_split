@@ -7,6 +7,37 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
+def quantize_wrapper(predicted_noise_npy, quantize):
+    if quantize == 'FP32':
+        quantizer = quantize
+
+    elif quantize == 'FP16':
+        quantizer = quantize
+        predicted_noise_npy = predicted_noise_npy.astype(np.float16)
+
+    elif 'FP8' in quantize:
+        if quantize == 'FP8(E4M3)':
+            quantizer = BasicCustomFloatQuantizer(4, 3, False)
+        elif quantize == 'FP8(E5M2)':
+            quantizer = BasicCustomFloatQuantizer(5, 2, False)
+
+        predicted_noise_npy_bytes = quantizer.quantize_ndarray(predicted_noise_npy)
+        predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_bytes, predicted_noise_npy.shape)
+
+    elif 'INT' in quantize or quantize == 'BOOL':
+        if quantize == 'BOOL':
+            bit = 1
+        else:
+            bit = int(quantize.split('INT')[1])
+        quantizer = AffineQuantizer(bit)
+        predicted_noise_npy_quantized = quantizer.quantize_ndarray(predicted_noise_npy)
+        predicted_noise_npy = quantizer.dequantize_ndarray(predicted_noise_npy_quantized)
+    else:
+        raise ValueError('Invalid quantize value')
+    
+    return predicted_noise_npy, quantizer
+
+
 class AffineQuantizer:
     def __init__(self, bit) -> None:
         self.b = bit

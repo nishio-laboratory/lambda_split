@@ -9,9 +9,12 @@ import torch
 
 
 class SplitComputingLoggerForLdm:
-    def __init__(self):
-        cur_dt_str = datetime.datetime.now().strftime('%y%m%d_%H%M%S')
-        self.log_dir = f'log/{cur_dt_str}'
+    def __init__(self, log_dir_name=None):
+        if log_dir_name is None:
+            cur_dt_str = datetime.datetime.now().strftime('%y%m%d_%H%M%S')
+            self.log_dir = f'log/{cur_dt_str}'
+        else:
+            self.log_dir = f'log/{log_dir_name}'
 
         os.makedirs(self.log_dir)
         os.makedirs(f'{self.log_dir}/predicted_noise_img')

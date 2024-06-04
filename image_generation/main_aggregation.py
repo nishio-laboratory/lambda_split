@@ -32,7 +32,7 @@ def main(
     cloud.to(cloud_device)
 
 
-    def infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize, cloud_quantize):
+    def infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize, cloud_quantize, num_aggregation_steps=1):
         fix_seed_and_free_memory(round(random_seed))
 
         # Triadic split computing : edge -> cloud -> edge
@@ -55,7 +55,7 @@ def main(
         )
 
         log_dir_name = f'{quantize}_{cloud_quantize}'
-        split_computing_logger = SplitComputingLoggerForLdm(log_dir_name=f'{prompt.split(" ")[0]}_{random_seed}/{quantize}_{cloud_quantize}')
+        split_computing_logger = SplitComputingLoggerForLdm()
         split_computing_logger.save_initial_data(
             prompt,
             prompt_embeds,
@@ -70,6 +70,8 @@ def main(
         yield f'0 / {num_inference_steps} (Head sub-model inference completed)', None, initial_image
 
         image = initial_image
+
+        aggregation_noise_list = []
 
         # Denoising
         for idx in tqdm(range(num_inference_steps)):
@@ -112,11 +114,15 @@ def main(
             # predicted_noise = predicted_noise.view(noise_shape)
 
             # Third subpipeline on edge
-            edge.infer_third_pipeline(idx, predicted_noise)
-
+            idx += 1
+            aggregation_noise_list.append(predicted_noise)
+            denoise_image = True if idx % num_aggregation_steps == num_aggregation_steps or idx == num_inference_steps else False
+            if denoise_image:
+                aggregated_noise = torch.sum(torch.stack(aggregation_noise_list, dim=0), dim=0)
+                edge.infer_third_pipeline(idx, aggregated_noise)
+                aggregation_noise_list = []
 
             # Post processing
-            idx += 1
             decode_image = True if idx % freq == 0 or idx == num_inference_steps else False
             if decode_image:
                 image = edge.decode_image()
@@ -200,19 +206,15 @@ def main(
         # demo.queue().launch(ssl_verify=False, server_name='0.0.0.0')
 
     else:
-        # prompt = 'An astronaut riding a green horse' # input('Prompt : ')
-        prompt = 'A majestic lion jumping from a big stone at night'
-        prompt = 'A robot painted as graffiti on a brick wall. a sidewalk is in front of the wall, and grass is growing out of cracks in the concrete.'
-        prompt = 'Panda mad scientist mixing sparkling chemicals, artstation.'
-        # prompt = 'Astronaut in a jungle, cold color palette, muted colors, detailed, 8k'
-        prompt = 'a close-up of a fire spitting dragon, cinematic shot'
+        prompt = 'An astronaut riding a green horse' # input('Prompt : ')
         num_inference_steps = 50 # int(input('Number of inference steps : '))
         random_seed = 42 # int(input('Random seed : '))
         freq = 10 # int(input('Generated image update frequency : '))
+        num_aggregation_steps = 2
 
         for cloud_quantize in [True]:
             for quantize in quantize_methods:
-                for yield_str, predicted_noise_pil, image in infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize, cloud_quantize):
+                for yield_str, predicted_noise_pil, image in infer_each_request(prompt, num_inference_steps, random_seed, freq, quantize, cloud_quantize, num_aggregation_steps):
                     pass
 
 
@@ -220,8 +222,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--edge_device', type=str, default='cpu', help='cuda or mps or cpu')
     parser.add_argument('--cloud_device', type=str, default='cuda', help='cuda or mps or cpu')
-    # parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "FP16", 'FP8(E4M3)', 'FP8(E5M2)', "INT8", "INT7", "INT6", "INT5", "INT4", "INT3", "INT2", "BOOL"], help='Quantization methods, you can add INTn (n > 8)')
-    parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "INT5", "INT4", "INT3"], help='Quantization methods, you can add INTn (n > 8)')
+    parser.add_argument('--quantize_methods', nargs='+', type=str, default=["FP32", "FP16", 'FP8(E4M3)', 'FP8(E5M2)', "INT8", "INT7", "INT6", "INT5", "INT4", "INT3", "INT2", "BOOL"], help='Quantization methods, you can add INTn (n > 8)')
     parser.add_argument('--no_gui', action='store_true', help='Disable Gradio GUI')
     args = parser.parse_args()
     print(args)

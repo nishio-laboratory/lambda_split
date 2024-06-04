@@ -26,11 +26,14 @@ class SplitComputingConfig(object):
     bandwidth: int = None
     dropout_rate: float = 1.0
     quantize_method: str = None
-    measure_tensor_size_method: bool = False # 'numpy_save'
-    save_hidden_states_to_file: bool = False
+    measure_tensor_size_method: bool = 'numpy_save'
+    save_hidden_states_to_file: bool = True
     export_split_model_torchinfo_summary: bool = True
 
     def __post_init__(self):
+        if self.save_hidden_states_to_file:
+            assert self.measure_tensor_size_method != False
+
         if self.wait_latency:
             assert self.measure_tensor_size_method is not None
             assert self.bandwidth is not None

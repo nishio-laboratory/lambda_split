@@ -16,3 +16,4 @@ diffusers==0.21.4
 seaborn
 einops
 scikit-image
+pyrtools

@@ -16,12 +16,15 @@
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from diffusers import StableDiffusionXLPipeline
 from diffusers.utils import replace_example_docstring
 from diffusers.configuration_utils import FrozenDict
 from diffusers.pipelines.stable_diffusion_xl.pipeline_output import StableDiffusionXLPipelineOutput
 from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import rescale_noise_cfg, EXAMPLE_DOC_STRING
+
+from src.quantizers import quantize_wrapper
 
 
 class EdgeStableDiffusionXLPipeline(StableDiffusionXLPipeline):
@@ -346,7 +349,7 @@ class CloudStableDiffusionXLPipeline(StableDiffusionXLPipeline):
 
 
     @torch.no_grad()
-    def infer_second_pipeline(self, i):
+    def infer_second_pipeline(self, i, cloud_quantize, quantize):
         t = self.timesteps[i]
 
         # expand the latents if we are doing classifier free guidance
@@ -374,8 +377,21 @@ class CloudStableDiffusionXLPipeline(StableDiffusionXLPipeline):
             # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
             noise_pred = rescale_noise_cfg(noise_pred, noise_pred_text, guidance_rescale=self.guidance_rescale)
 
-        # compute the previous noisy sample x_t -> x_t-1
-        self.latents = self.scheduler.step(noise_pred, t, self.latents, **self.extra_step_kwargs, return_dict=False)[0]
+        if cloud_quantize:
+            # 送信データの量子化
+            predicted_noise_npy = noise_pred.detach().cpu().numpy()
+            quantized_noise_npy, _ = quantize_wrapper(predicted_noise_npy, quantize)
+
+            # 量子化されたノイズを再度Float32に変換
+            dequantized_noise_npy = quantized_noise_npy.astype(np.float32)
+            dequantized_noise = torch.from_numpy(dequantized_noise_npy).to(self._execution_device)
+
+            # compute the previous noisy sample x_t -> x_t-1
+            self.latents = self.scheduler.step(dequantized_noise, t, self.latents, **self.extra_step_kwargs, return_dict=False)[0]
+
+        else:
+            # compute the previous noisy sample x_t -> x_t-1
+            self.latents = self.scheduler.step(noise_pred, t, self.latents, **self.extra_step_kwargs, return_dict=False)[0]
 
         # call the callback, if provided
         if i == len(self.timesteps) - 1 or ((i + 1) > self.num_warmup_steps and (i + 1) % self.scheduler.order == 0):
