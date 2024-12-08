@@ -134,7 +134,7 @@ def main(
     else:
         # テキスト生成の Config
         simplified_generation_config = SimplifiedGenerationConfig(
-            max_new_tokens=500,
+            max_new_tokens=76,
             do_sample=False,
             temperature=1,
             top_k=50,
@@ -142,6 +142,7 @@ def main(
         )
 
         input_text = 'What is the difference between AI, ML and DL?' # input('Input text : ')
+        input_text = 'What is generative AI?' # input('Input text : ')
         # input_text = '人工知能と機械学習、深層学習の違いはなんですか？' # input('Input text : ')
         for response in infer_each_request(input_text, None, **asdict(simplified_generation_config)):
             print(response)

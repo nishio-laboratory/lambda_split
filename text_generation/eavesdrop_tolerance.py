@@ -14,8 +14,10 @@ from src.utils import SplitComputingConfig, LlmConfig, SimplifiedGenerationConfi
 
 
 dropout_method_list = ['random'] # 'block'
-dropout_rate_list = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-tail_layers_list = [1, 4, 8]
+#dropout_rate_list = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+dropout_rate_list = [0.0]
+#tail_layers_list = [1, 4, 8]
+tail_layers_list = [1]
 
 
 df = pd.DataFrame(columns=['dropout_method', 'dropout_rate', 'tail_layers', 'output_text'])
@@ -153,40 +155,80 @@ for tail_layers in tail_layers_list:
                 simplified_generation_config
             )
 
-            try:
-                for idx in tqdm(range(simplified_generation_config.max_new_tokens)):
-                    print(idx)
+            mode = "edge_to_cloud"
 
-                    ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
-                    second_feature_vector_for_send = np.load(f'log/eavesdrop_{tail_layers}/hidden_state_files/cloud_to_edge/{str(idx).zfill(3)}.npy')
-                    # シャッフルする
-                    rng = np.random.default_rng()
-                    second_feature_vector_for_send = rng.permutation(second_feature_vector_for_send, axis=2)
-                    second_feature_vector_for_send = torch.from_numpy(second_feature_vector_for_send).to(edge.device)
-                    # second_feature_vector_for_send = torch.nn.functional.dropout(second_feature_vector_for_send.float(), p=dropout_rate, training=True).half()
+            if mode == "edge_to_cloud":
+                try:
+                    for idx in tqdm(range(simplified_generation_config.max_new_tokens)):
+                        ## First model : 0 から first_split_layer_index の層まで推論する
+                        first_feature_vector_for_send = np.load(f'log/2/hidden_state_files/edge_to_cloud/{str(idx).zfill(3)}.npy')
+
+                        # シャッフルする
+                        rng = np.random.default_rng()
+                        first_feature_vector_for_send = rng.permutation(first_feature_vector_for_send, axis=2)
+                        first_feature_vector_for_send = torch.from_numpy(first_feature_vector_for_send).to(cloud.device)
+
+                        ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
+                        second_feature_vector_for_send = cloud.infer_second_model(first_feature_vector_for_send)
+
+                        # second_feature_vector_for_send = torch.nn.functional.dropout(second_feature_vector_for_send.float(), p=dropout_rate, training=True).half()
+
+                        ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
+                        output = edge.infer_third_model(second_feature_vector_for_send)
+
+                        ## 推論結果のロジットから次のトークンを選択する
+                        next_tokens = edge.sample_next_token(output.logits, simplified_generation_config)
+                        
+                        # 次のトークンを追加する
+                        output_ids = torch.cat([input_ids, next_tokens], dim=-1)
+
+                        # EOS トークンが生成されたら終了する, それ以外の場合はinput_idsを更新する
+                        if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
+                            break
+
+                        input_ids = output_ids
+
+                        # デトークナイズされたテキストを出力
+                        output_text = edge.tokenizer.decode(output_ids[0, input_length:]).strip()
+
+                except FileNotFoundError:
+                    pass
+            
+            else:
+                try:
+                    for idx in tqdm(range(simplified_generation_config.max_new_tokens)):
+                        print(idx)
+
+                        ## Second model : first_split_layer_index から second_split_layer_index の層まで推論する
+                        second_feature_vector_for_send = np.load(f'log/table4/hidden_state_files/cloud_to_edge/{str(idx).zfill(3)}.npy')
+                        # シャッフルする
+                        rng = np.random.default_rng()
+                        second_feature_vector_for_send = rng.permutation(second_feature_vector_for_send, axis=2)
+                        second_feature_vector_for_send = torch.from_numpy(second_feature_vector_for_send).to(edge.device)
+                        # second_feature_vector_for_send = torch.nn.functional.dropout(second_feature_vector_for_send.float(), p=dropout_rate, training=True).half()
 
 
 
-                    ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
-                    output = edge.infer_third_model(second_feature_vector_for_send)
+                        ## Third model : second_split_layer_index から 最後の層 (self.llm_config.num_decoder_layers) まで推論する
+                        output = edge.infer_third_model(second_feature_vector_for_send)
 
-                    ## 推論結果のロジットから次のトークンを選択する
-                    next_tokens = edge.sample_next_token(output.logits, simplified_generation_config)
-                    
-                    # 次のトークンを追加する
-                    output_ids = torch.cat([input_ids, next_tokens], dim=-1)
+                        ## 推論結果のロジットから次のトークンを選択する
+                        next_tokens = edge.sample_next_token(output.logits, simplified_generation_config)
+                        
+                        # 次のトークンを追加する
+                        output_ids = torch.cat([input_ids, next_tokens], dim=-1)
 
-                    # EOS トークンが生成されたら終了する, それ以外の場合はinput_idsを更新する
-                    if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
-                        break
+                        # EOS トークンが生成されたら終了する, それ以外の場合はinput_idsを更新する
+                        if next_tokens[0, -1] == edge.tokenizer.eos_token_id:
+                            break
 
-                    input_ids = output_ids
+                        input_ids = output_ids
 
-                    # デトークナイズされたテキストを出力
-                    output_text = edge.tokenizer.decode(output_ids[0, input_length:]).strip()
+                        # デトークナイズされたテキストを出力
+                        output_text = edge.tokenizer.decode(output_ids[0, input_length:]).strip()
 
-            except FileNotFoundError:
-                pass
+                except FileNotFoundError:
+                    pass
 
 
             # # 最後の隠れ層の平均を取ることで文のベクトルを得る
